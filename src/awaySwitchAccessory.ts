@@ -52,9 +52,10 @@ export class AwaySwitchAccessory {
 		// Poll for updates
 		setInterval(async () => {
 			const apiStatus = await this.checkStatusFromAPI();
-			const currentState = this.mapClimateToSecurityState(apiStatus);
+			const currentState = this.mapClimateToSecurityState(apiStatus, false);  // explicit false for current state
+			const targetState = this.mapClimateToSecurityState(apiStatus, true);    // explicit true for target state
 			this.service.updateCharacteristic(this.platform.Characteristic.SecuritySystemCurrentState, currentState);
-			this.service.updateCharacteristic(this.platform.Characteristic.SecuritySystemTargetState, currentState);
+			this.service.updateCharacteristic(this.platform.Characteristic.SecuritySystemTargetState, targetState);
 			this.platform.log.debug('Pushed updated current state to HomeKit:', apiStatus);
 		}, 30 * 60 * 1000);
 	}
@@ -62,15 +63,21 @@ export class AwaySwitchAccessory {
 	/**
 	 * Maps climate mode to HomeKit security system state
 	 */
-	private mapClimateToSecurityState(climate: string): number {
+	private mapClimateToSecurityState(climate: string, isTarget = false): number {
 		switch (climate) {
 		case this.CLIMATE_AWAY:
-			return this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM;
+			return isTarget 
+				? this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM
+				: this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM;
 		case this.CLIMATE_SLEEP:
-			return this.platform.Characteristic.SecuritySystemCurrentState.NIGHT_ARM;
+			return isTarget
+				? this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM
+				: this.platform.Characteristic.SecuritySystemCurrentState.NIGHT_ARM;
 		case this.CLIMATE_HOME:
 		default:
-			return this.platform.Characteristic.SecuritySystemCurrentState.STAY_ARM;
+			return isTarget
+				? this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM
+				: this.platform.Characteristic.SecuritySystemCurrentState.STAY_ARM;
 		}
 	}
 
@@ -126,6 +133,16 @@ export class AwaySwitchAccessory {
 					{headers: {'Authorization': 'Bearer ' + authToken}},
 				);
 				this.platform.log.info(`Set Ecobee to home with result: ${JSON.stringify(homeSetRequest.data)}`);
+				
+				// Verify the change was successful
+				if (homeSetRequest.data.status.code === 0) {
+					// Update both current and target state
+					this.service.updateCharacteristic(
+						this.platform.Characteristic.SecuritySystemCurrentState,
+						targetState,
+					);
+					this.platform.log.debug('Successfully updated to HOME state');
+				}
 			} else {
 				// Set hold for away or sleep mode
 				const setHoldBody = {
@@ -148,11 +165,21 @@ export class AwaySwitchAccessory {
 					{headers: {'Authorization': 'Bearer ' + authToken}},
 				);
 				this.platform.log.info(`Set Ecobee to ${climateRef} with result: ${JSON.stringify(setHoldRequest.data)}`);
+				
+				// Verify the change was successful
+				if (setHoldRequest.data.status.code === 0) {
+					// Update both current and target state
+					this.service.updateCharacteristic(
+						this.platform.Characteristic.SecuritySystemCurrentState,
+						targetState,
+					);
+					this.platform.log.debug(`Successfully updated to ${climateRef.toUpperCase()} state`);
+				}
 			}
 
-			this.platform.log.debug('Set Target State ->', value);
 			callback(null);
 		} catch (error) {
+			this.platform.log.error('Failed to set state:', error);
 			callback(error as Error);
 		}
 	}
@@ -162,7 +189,7 @@ export class AwaySwitchAccessory {
 	 */
 	async getTargetState(callback: CharacteristicGetCallback) {
 		const apiStatus = await this.checkStatusFromAPI();
-		const state = this.mapClimateToSecurityState(apiStatus);
+		const state = this.mapClimateToSecurityState(apiStatus, true); // Add true for target state
 		this.platform.log.debug('Get Target State ->', state);
 		callback(null, state);
 	}
@@ -172,7 +199,7 @@ export class AwaySwitchAccessory {
 	 */
 	async getCurrentState(callback: CharacteristicGetCallback) {
 		const apiStatus = await this.checkStatusFromAPI();
-		const state = this.mapClimateToSecurityState(apiStatus);
+		const state = this.mapClimateToSecurityState(apiStatus, false); // Add false for current state
 		this.platform.log.debug('Get Current State ->', state);
 		callback(null, state);
 	}
