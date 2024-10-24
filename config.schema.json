@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "EcobeeAway",
+  "pluginAlias": "EcobeeStatus",
   "pluginType": "platform",
   "singular": true,
   "schema": {
@@ -9,7 +9,7 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Ecobee Away"
+        "default": "Ecobee Status"
       },
       "refreshToken": {
         "title": "Ecobee Refresh Token",
