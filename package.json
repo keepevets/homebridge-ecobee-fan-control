@@ -1,20 +1,24 @@
 {
-  "displayName": "Ecobee Status",
+  "displayName": "Homebridge Ecobee Status",
   "name": "homebridge-ecobee-status",
   "version": "1.0.4",
-  "description": "Homebridge plugin to control Ecobee thermostat home/away/sleep status",
+  "description": "Homebridge plugin to control Ecobee thermostat Home/Away/Sleep status through HomeKit security system interface",
   "author": "Spencer S",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git@github.com:sbs44/homebridge-ecobee-status.git"
+    "url": "git://github.com/sbs44/homebridge-ecobee-status.git"
   },
   "bugs": {
     "url": "https://github.com/sbs44/homebridge-ecobee-status/issues"
   },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/sbs44"
+  },
   "engines": {
     "node": ">=14",
-    "homebridge": ">1.3.0"
+    "homebridge": ">=1.3.0"
   },
   "main": "dist/index.js",
   "bin": {
@@ -27,7 +31,15 @@
     "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [
-    "homebridge-plugin"
+    "homebridge-plugin",
+    "homebridge",
+    "ecobee",
+    "thermostat",
+    "home",
+    "away",
+    "sleep",
+    "climate",
+    "security"
   ],
   "dependencies": {
     "axios": "^0.21.1",
