@@ -60,7 +60,7 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 		const controlDevices = [
 			{
 				uniqueId: 'away',
-				displayName: 'Ecobee Away',
+				displayName: 'Ecobee Status',
 			},
 		];
 
