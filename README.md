@@ -93,8 +93,10 @@ The status will automatically sync between HomeKit and your Ecobee every 30 minu
 
 ## Credits
 
-This plugin is a fork of [homebridge-ecobee-away](https://www.npmjs.com/package/homebridge-ecobee-away) by the original author. Additional features and improvements have been added while maintaining compatibility with the original functionality.
+This plugin is a fork of [homebridge-ecobee-away](https://www.npmjs.com/package/homebridge-ecobee-away) originally created by [Vortec4800](https://github.com/Vortec4800). This fork adds support for Sleep mode and improves state handling while maintaining compatibility with the original functionality.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](LICENSE) file for details.
+
+Copyright for portions of project homebridge-ecobee-status are held by Vortec4800 as part of project homebridge-ecobee-away. All other copyright for project homebridge-ecobee-status is held by Spencer S, 2024.
