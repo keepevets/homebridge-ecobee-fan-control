@@ -1,16 +1,16 @@
 {
-  "displayName": "Ecobee Away",
-  "name": "homebridge-ecobee-away",
+  "displayName": "Ecobee Status",
+  "name": "homebridge-ecobee-status",
   "version": "1.0.4",
-  "description": "Homebridge plugin to control Ecobee thermostat home/away status",
-  "author": "Cory Imdieke",
+  "description": "Homebridge plugin to control Ecobee thermostat home/away/sleep status",
+  "author": "Spencer S",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git@github.com:Vortec4800/homebridge-ecobee-away.git"
+    "url": "git@github.com:sbs44/homebridge-ecobee-status.git"
   },
   "bugs": {
-    "url": "https://github.com/Vortec4800/homebridge-ecobee-away/issues"
+    "url": "https://github.com/sbs44/homebridge-ecobee-status/issues"
   },
   "engines": {
     "node": ">=14",
