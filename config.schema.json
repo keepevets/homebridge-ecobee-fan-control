@@ -22,6 +22,25 @@
         "description": "List of thermostat serial numbers to control. You can leave blank if you only have a single thermostat.",
         "type": "string",
         "placeholder": "e.g. 100904852660,654234216036"
+      },
+      "enableAutomationSwitch": {
+        "title": "Enable Automation Switch",
+        "description": "Add an additional switch that can be used for location-based automations",
+        "type": "boolean",
+        "default": false
+      },
+      "automationSwitchType": {
+        "title": "Automation Switch Type",
+        "description": "Type of switch to use for automation control",
+        "type": "string",
+        "default": "switch",
+        "oneOf": [
+          { "title": "Regular Switch", "enum": ["switch"] },
+          { "title": "Stateless Switch", "enum": ["stateless"] }
+        ],
+        "condition": {
+          "functionBody": "return model.enableAutomationSwitch === true;"
+        }
       }
     }
   }
