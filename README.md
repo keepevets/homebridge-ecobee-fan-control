@@ -3,28 +3,30 @@
 </p>
 
 # Homebridge Ecobee Status Control
+
 [![npm](https://img.shields.io/npm/v/homebridge-ecobee-status.svg)](https://www.npmjs.com/package/homebridge-ecobee-status)
 
-This Homebridge plugin provides a security system interface to control your Ecobee thermostat's climate status (Home/Away/Sleep). It's perfect for creating automations to control your thermostat's mode based on your daily routines or other triggers.
-
-*This is a fork of [homebridge-ecobee-away](https://www.npmjs.com/package/homebridge-ecobee-away) with added support for Sleep mode and improved state handling.*
+This Homebridge plugin provides an elegant way to control your Ecobee thermostat's climate status (Home/Away/Sleep) through HomeKit's security system interface. Perfect for creating automations based on your daily routines or other triggers.
 
 ## Features
 
 - Control your Ecobee's status through HomeKit's security system interface
 - Three state options:
-  - **Home** (Stay Armed): Resumes your regular program
-  - **Away** (Away Armed): Sets thermostat to Away mode
-  - **Sleep** (Night Armed): Sets thermostat to Sleep mode
-- Real-time status updates
-- Works best with auto home/away disabled
+  - **Home** (Stay Armed) - Resumes your regular program
+  - **Away** (Away Armed) - Sets thermostat to Away mode
+  - **Sleep** (Night Armed) - Sets thermostat to Sleep mode
+- Real-time status updates every 30 minutes
+- Optional automation-friendly switch for simpler Home/Away control
 - Support for single or multiple thermostats
+- Automatic token refresh handling
+- Error recovery with automatic retries
 
 ## Installation
 
-Assuming a global installation of `homebridge`:
+1. Install Homebridge (if not already installed)
+2. Install this plugin:
 ```bash
-npm i -g --unsafe-perm homebridge-ecobee-status
+npm i -g homebridge-ecobee-status
 ```
 
 ## Configuration
@@ -38,7 +40,8 @@ Add the `EcobeeStatus` platform in your homebridge `config.json` file:
       "name": "Ecobee Status",
       "platform": "EcobeeStatus",
       "refreshToken": "token generated with ecobee-auth-cli",
-      "thermostatSerialNumbers": "100904852660,654234216036"
+      "thermostatSerialNumbers": "100904852660,654234216036",
+      "enableAutomationSwitch": false
     }
   ]
 }
@@ -46,22 +49,33 @@ Add the `EcobeeStatus` platform in your homebridge `config.json` file:
 
 ### Configuration Options
 
-| Field | Required | Description |
-|-------|----------|-------------|
+| Option | Required | Description |
+|--------|----------|-------------|
 | `name` | No | The name that will appear in your Home app |
 | `platform` | Yes | Must be "EcobeeStatus" |
 | `refreshToken` | Yes | Authentication token (see below) |
 | `thermostatSerialNumbers` | No | Comma-separated list of thermostats to control |
+| `enableAutomationSwitch` | No | Adds a simple ON/OFF switch for Away control (default: false) |
 
 ### Getting a Refresh Token
 
-1. Install the plugin globally
-2. Run `ecobee-auth-cli` from your terminal
+1. Install the plugin globally:
+```bash
+npm i -g homebridge-ecobee-status
+```
+
+2. Run the authentication CLI:
+```bash
+ecobee-auth-cli
+```
+
 3. Follow the prompts to:
    - Log in to your Ecobee web portal
-   - Navigate to the "Apps" tab
+   - Navigate to the "My Apps" tab
    - Enter the provided PIN
-4. Copy the generated token into your config file
+   - Authorize the application
+
+4. Copy the generated refresh token into your config file
 
 The plugin will automatically handle token refreshes and update the config file as needed.
 
@@ -70,6 +84,17 @@ The plugin will automatically handle token refreshes and update the config file 
 If you have multiple thermostats, you can specify which ones to control by adding their serial numbers. Find these in your Ecobee app or website under each thermostat's "About" page.
 
 Leave this field blank to control all registered thermostats.
+
+### Automation Switch (Optional)
+
+Enable `enableAutomationSwitch` to add a simple ON/OFF switch that controls Home/Away status. This can be useful for:
+- HomeKit automations that don't support security system triggers
+- Simple Home/Away control without the security system interface
+- Third-party integrations
+
+The switch states correspond to:
+- ON = Away
+- OFF = Home
 
 ## Usage
 
@@ -91,12 +116,16 @@ The status will automatically sync between HomeKit and your Ecobee every 30 minu
 - **Multiple Thermostats**: Verify serial numbers are correct in config
 - **Status Not Updating**: Ensure auto home/away is disabled in Ecobee settings
 
-## Credits
+## Support
 
-This plugin is a fork of [homebridge-ecobee-away](https://www.npmjs.com/package/homebridge-ecobee-away) originally created by [Vortec4800](https://github.com/Vortec4800). This fork adds support for Sleep mode and improves state handling while maintaining compatibility with the original functionality.
+- For bug reports or feature requests, please [open an issue](https://github.com/sbs44/homebridge-ecobee-status/issues)
+- For questions or discussions, visit the [Discussions](https://github.com/sbs44/homebridge-ecobee-status/discussions) page
 
 ## License
 
 This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](LICENSE) file for details.
 
-Copyright for portions of project homebridge-ecobee-status are held by Vortec4800 as part of project homebridge-ecobee-away. All other copyright for project homebridge-ecobee-status is held by Spencer S, 2024.
+## Credits
+
+- Original `homebridge-ecobee-away` plugin by [Vortec4800](https://github.com/Vortec4800)
+- Current maintainer: [Spencer S](https://github.com/sbs44)
