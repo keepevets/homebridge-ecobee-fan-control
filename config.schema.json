@@ -22,6 +22,12 @@
         "description": "List of thermostat serial numbers to control. You can leave blank if you only have a single thermostat.",
         "type": "string",
         "placeholder": "e.g. 100904852660,654234216036"
+      },
+      "enableAutomationSwitch": {
+        "title": "Enable Away Switch",
+        "description": "Add an additional switch that can be used for location-based automations (ON = Away, OFF = Home)",
+        "type": "boolean",
+        "default": false
       }
     }
   }

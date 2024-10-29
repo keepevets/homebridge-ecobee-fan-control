@@ -97,6 +97,37 @@ export class AwaySwitchAccessory {
 	}
 
 	/**
+	 * Helper method to handle API requests with retry logic
+	 */
+	private async makeEcobeeRequest<T>(request: () => Promise<T>, operationType: string): Promise<T> {
+		try {
+			return await request();
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				this.platform.log.error(`Ecobee API Error during ${operationType}:`, {
+					status: error.response?.status,
+					statusText: error.response?.statusText,
+					data: error.response?.data,
+					url: error.config?.url,
+					method: error.config?.method,
+				});
+
+				// If we get a 500 error, wait a bit and retry once
+				if (error.response?.status === 500) {
+					this.platform.log.info(`Retrying ${operationType} after 500 error...`);
+					await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+					return await request();
+				}
+
+				throw error; // Re-throw if not a 500 error
+			} else {
+				this.platform.log.error(`Non-Axios error during ${operationType}:`, error);
+				throw error;
+			}
+		}
+	}
+
+	/**
 	 * Handle SET requests from HomeKit
 	 */
 	async setTargetState(value: CharacteristicValue, callback: CharacteristicSetCallback) {
@@ -111,9 +142,8 @@ export class AwaySwitchAccessory {
 			const authToken = AuthTokenManager.getInstance().authToken;
 			const selectionMatch = this.platform.config.thermostatSerialNumbers || '';
 			const selectionType = selectionMatch ? 'thermostats' : 'registered';
-
+	
 			if (climateRef === this.CLIMATE_HOME) {
-				// Resume program for home mode
 				const homeBody = {
 					'selection': {
 						'selectionType': selectionType,
@@ -128,23 +158,27 @@ export class AwaySwitchAccessory {
 						},
 					],
 				};
-				const homeSetRequest = await axios.post('https://api.ecobee.com/1/thermostat?format=json', 
-					homeBody, 
-					{headers: {'Authorization': 'Bearer ' + authToken}},
+	
+				const homeSetRequest = await this.makeEcobeeRequest(
+					() => axios.post('https://api.ecobee.com/1/thermostat?format=json', 
+						homeBody, 
+						{headers: {'Authorization': 'Bearer ' + authToken}},
+					),
+					'HOME mode set',
 				);
+				
 				this.platform.log.info(`Set Ecobee to home with result: ${JSON.stringify(homeSetRequest.data)}`);
 				
-				// Verify the change was successful
 				if (homeSetRequest.data.status.code === 0) {
-					// Update both current and target state
 					this.service.updateCharacteristic(
 						this.platform.Characteristic.SecuritySystemCurrentState,
 						targetState,
 					);
 					this.platform.log.debug('Successfully updated to HOME state');
+				} else {
+					throw new Error(`Failed to set HOME mode: ${JSON.stringify(homeSetRequest.data)}`);
 				}
 			} else {
-				// Set hold for away or sleep mode
 				const setHoldBody = {
 					'selection': {
 						'selectionType': selectionType,
@@ -160,23 +194,28 @@ export class AwaySwitchAccessory {
 						},
 					],
 				};
-				const setHoldRequest = await axios.post('https://api.ecobee.com/1/thermostat?format=json', 
-					setHoldBody, 
-					{headers: {'Authorization': 'Bearer ' + authToken}},
+	
+				const setHoldRequest = await this.makeEcobeeRequest(
+					() => axios.post('https://api.ecobee.com/1/thermostat?format=json', 
+						setHoldBody, 
+						{headers: {'Authorization': 'Bearer ' + authToken}},
+					),
+					`${climateRef.toUpperCase()} mode set`,
 				);
+				
 				this.platform.log.info(`Set Ecobee to ${climateRef} with result: ${JSON.stringify(setHoldRequest.data)}`);
 				
-				// Verify the change was successful
 				if (setHoldRequest.data.status.code === 0) {
-					// Update both current and target state
 					this.service.updateCharacteristic(
 						this.platform.Characteristic.SecuritySystemCurrentState,
 						targetState,
 					);
 					this.platform.log.debug(`Successfully updated to ${climateRef.toUpperCase()} state`);
+				} else {
+					throw new Error(`Failed to set ${climateRef.toUpperCase()} mode: ${JSON.stringify(setHoldRequest.data)}`);
 				}
 			}
-
+	
 			callback(null);
 		} catch (error) {
 			this.platform.log.error('Failed to set state:', error);
@@ -208,29 +247,42 @@ export class AwaySwitchAccessory {
 	 * Check the current climate status from the Ecobee API
 	 */
 	private async checkStatusFromAPI(): Promise<string> {
-		const needsRefresh = AuthTokenManager.getInstance().isExpired();
-		if (needsRefresh) {
-			await AuthTokenManager.getInstance().renewAuthToken();
-		}
-		const authToken = AuthTokenManager.getInstance().authToken;
+		try {
+			const needsRefresh = AuthTokenManager.getInstance().isExpired();
+			if (needsRefresh) {
+				await AuthTokenManager.getInstance().renewAuthToken();
+			}
+			const authToken = AuthTokenManager.getInstance().authToken;
 
-		const queryRequest = await axios.get(
-			'https://api.ecobee.com/1/thermostat?format=json&body={"selection":{"selectionType":"registered","selectionMatch":"","includeEvents":true}}',
-			{headers: {'Authorization': 'Bearer ' + authToken}},
-		);
-		const queryData = queryRequest.data;
+			try {
+				const queryRequest = await this.makeEcobeeRequest(
+					() => axios.get(
+						'https://api.ecobee.com/1/thermostat?format=json&body={"selection":{"selectionType":"registered","selectionMatch":"","includeEvents":true}}',
+						{headers: {'Authorization': 'Bearer ' + authToken}},
+					),
+					'status check',
+				);
+				const queryData = queryRequest.data;
 
-		if (!queryData || !queryData.thermostatList) {
-			this.platform.log.error('Unexpected query data: ' + JSON.stringify(queryData));
-			return this.CLIMATE_HOME;
-		}
-			
-		const events = queryData.thermostatList[0].events;
+				if (!queryData || !queryData.thermostatList) {
+					this.platform.log.error('Unexpected query data structure:', JSON.stringify(queryData));
+					return this.CLIMATE_HOME;
+				}
+					
+				const events = queryData.thermostatList[0].events;
 
-		if (events.length > 0) {
-			const mostRecentEvent = events[0];
-			return mostRecentEvent.holdClimateRef || this.CLIMATE_HOME;
-		} else {
+				if (events.length > 0) {
+					const mostRecentEvent = events[0];
+					return mostRecentEvent.holdClimateRef || this.CLIMATE_HOME;
+				} else {
+					return this.CLIMATE_HOME;
+				}
+			} catch (error) {
+				this.platform.log.error('Failed to check status:', error);
+				return this.CLIMATE_HOME;
+			}
+		} catch (error) {
+			this.platform.log.error('Error in checkStatusFromAPI:', error);
 			return this.CLIMATE_HOME;
 		}
 	}

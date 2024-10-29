@@ -2,7 +2,7 @@ import { API, IndependentPlatformPlugin, Logger, PlatformAccessory, PlatformConf
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { AwaySwitchAccessory } from './awaySwitchAccessory';
-
+import { AutomationSwitchAccessory } from './automationSwitchAccessory';
 import { AuthTokenManager } from './auth-token-refresh';
 
 /**
@@ -66,7 +66,6 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 
 		// loop over the discovered devices and register each one if it has not already been registered
 		for (const device of controlDevices) {
-
 			// generate a unique id for the accessory this should be generated from
 			// something globally unique, but constant, for example, the device serial
 			// number or MAC address
@@ -86,12 +85,11 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 
 				// create the accessory handler for the restored accessory
 				// this is imported from `platformAccessory.ts`
-				if(device.uniqueId === 'away') {
+				if (device.uniqueId === 'away') {
 					new AwaySwitchAccessory(this, existingAccessory);
 				} else {
 					throw 'Invalid accessory ID';
 				}
-
 			} else {
 				// the accessory does not yet exist, so we need to create it
 				this.log.info('Adding new accessory:', device.displayName);
@@ -105,7 +103,7 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 
 				// create the accessory handler for the newly create accessory
 				// this is imported from `platformAccessory.ts`
-				if(device.uniqueId === 'away'){
+				if (device.uniqueId === 'away') {
 					new AwaySwitchAccessory(this, accessory);
 				} else {
 					throw 'Invalid accessory ID';
@@ -114,10 +112,46 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 				// link the accessory to your platform
 				this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
 			}
-
-			// it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
-			// this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
 		}
 
+		// Handle "Ecobee Away" switch if enabled - provides automation-friendly control of Away/Home status
+		if (this.config.enableAutomationSwitch) {
+			const automationDevice = {
+				uniqueId: 'automation-control',
+				displayName: 'Ecobee Away',  // Updated name
+			};
+
+			const automationUuid = this.api.hap.uuid.generate(automationDevice.uniqueId);
+			const existingAutomationAccessory = this.accessories.find(
+				accessory => accessory.UUID === automationUuid,
+			);
+
+			// Find the main security system accessory
+			const mainAccessory = this.accessories.find(
+				accessory => accessory.UUID === this.api.hap.uuid.generate('away'),
+			);
+
+			if (!mainAccessory) {
+				this.log.error('Main security system accessory not found');
+				return;
+			}
+
+			if (existingAutomationAccessory) {
+				this.log.info('Restoring existing automation accessory from cache:',
+					existingAutomationAccessory.displayName);
+				new AutomationSwitchAccessory(this, existingAutomationAccessory, mainAccessory);
+			} else {
+				this.log.info('Adding new automation accessory:', automationDevice.displayName);
+				const accessory = new this.api.platformAccessory(
+					automationDevice.displayName,
+					automationUuid,
+				);
+				accessory.context.device = automationDevice;
+				
+				new AutomationSwitchAccessory(this, accessory, mainAccessory);
+				
+				this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+			}
+		}
 	}
 }
