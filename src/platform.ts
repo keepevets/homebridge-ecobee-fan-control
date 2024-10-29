@@ -114,11 +114,11 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 			}
 		}
 
-		// Handle automation switch if enabled
+		// Handle "Ecobee Away" switch if enabled - provides automation-friendly control of Away/Home status
 		if (this.config.enableAutomationSwitch) {
 			const automationDevice = {
 				uniqueId: 'automation-control',
-				displayName: 'Ecobee Automation',
+				displayName: 'Ecobee Away',  // Updated name
 			};
 
 			const automationUuid = this.api.hap.uuid.generate(automationDevice.uniqueId);

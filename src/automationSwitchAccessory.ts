@@ -17,45 +17,32 @@ export class AutomationSwitchAccessory {
 		// Set accessory information
 		this.accessory.getService(this.platform.Service.AccessoryInformation)!
 			.setCharacteristic(this.platform.Characteristic.Manufacturer, 'Ecobee')
-			.setCharacteristic(this.platform.Characteristic.Model, 'Automation Controller')
-			.setCharacteristic(this.platform.Characteristic.SerialNumber, 'ECOBEEAUTO1');
+			.setCharacteristic(this.platform.Characteristic.Model, 'Away Switch')
+			.setCharacteristic(this.platform.Characteristic.SerialNumber, 'ECOBEEAWAY2');
 
-		if (this.platform.config.automationSwitchType === 'stateless') {
-			// Use StatelessProgrammableSwitch for a button-style interface
-			this.service = this.accessory.getService(this.platform.Service.StatelessProgrammableSwitch) ||
-				this.accessory.addService(this.platform.Service.StatelessProgrammableSwitch);
+		// Use Switch for a toggle interface
+		this.service = this.accessory.getService(this.platform.Service.Switch) ||
+			this.accessory.addService(this.platform.Service.Switch);
 
-			this.service.setCharacteristic(
-				this.platform.Characteristic.ProgrammableSwitchEvent,
-				this.platform.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS,
-			);
-
-			// Handle switch events
-			this.service.getCharacteristic(this.platform.Characteristic.ProgrammableSwitchEvent)
-				.onSet(this.handleStatelessSwitch.bind(this));
-		} else {
-			// Use Switch for a toggle interface
-			this.service = this.accessory.getService(this.platform.Service.Switch) ||
-				this.accessory.addService(this.platform.Service.Switch);
-
-			// Handle switch state changes
-			this.service.getCharacteristic(this.platform.Characteristic.On)
-				.onSet(this.handleSwitch.bind(this))
-				.onGet(this.getSwitchState.bind(this));
-		}
+		// Handle switch state changes
+		this.service.getCharacteristic(this.platform.Characteristic.On)
+			.onSet(this.handleSwitch.bind(this))
+			.onGet(this.getSwitchState.bind(this));
 
 		// Set the service name
 		this.service.setCharacteristic(
 			this.platform.Characteristic.Name,
-			`${accessory.context.device.displayName} Automation`,
+			'Ecobee Away',
 		);
 	}
 
 	/**
-	 * Handle regular switch events
+	 * Handle switch events
+	 * ON = Away mode
+	 * OFF = Home mode
 	 */
 	private async handleSwitch(value: CharacteristicValue) {
-		const newState = value as boolean;
+		const isOn = value as boolean;
 
 		try {
 			// Get the security system service from the main accessory
@@ -64,8 +51,8 @@ export class AutomationSwitchAccessory {
 				throw new Error('Security service not found');
 			}
 
-			// Convert switch state to climate state
-			const climateState = newState ? ClimateState.HOME : ClimateState.AWAY;
+			// Convert switch state to climate state (ON = Away, OFF = Home)
+			const climateState = isOn ? ClimateState.AWAY : ClimateState.HOME;
 
 			// Update the security system state
 			await securityService.setCharacteristic(
@@ -81,35 +68,8 @@ export class AutomationSwitchAccessory {
 	}
 
 	/**
-	 * Handle stateless switch events
-	 */
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	private async handleStatelessSwitch(_value: CharacteristicValue) {
-		try {
-			// Toggle between Home and Away
-			const newState = this.lastTriggeredState === ClimateState.HOME
-				? ClimateState.AWAY
-				: ClimateState.HOME;
-
-			const securityService = this.mainAccessory.getService(this.platform.Service.SecuritySystem);
-			if (!securityService) {
-				throw new Error('Security service not found');
-			}
-
-			await securityService.setCharacteristic(
-				this.platform.Characteristic.SecuritySystemTargetState,
-				this.mapClimateToSecurityState(newState),
-			);
-
-			this.lastTriggeredState = newState;
-		} catch (error) {
-			this.platform.log.error('Failed to handle stateless switch event:', error);
-			throw error;
-		}
-	}
-
-	/**
 	 * Get current switch state based on climate state
+	 * Returns true if Away, false if Home
 	 */
 	private async getSwitchState(): Promise<boolean> {
 		const securityService = this.mainAccessory.getService(this.platform.Service.SecuritySystem);
@@ -121,7 +81,8 @@ export class AutomationSwitchAccessory {
 			this.platform.Characteristic.SecuritySystemCurrentState,
 		).value;
 
-		return this.mapSecurityToSwitchState(currentState as number);
+		// Return true if Away, false if Home
+		return currentState === this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM;
 	}
 
 	/**
