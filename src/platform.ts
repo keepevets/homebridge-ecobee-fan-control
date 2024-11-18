@@ -57,100 +57,54 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 	 * must not be registered again to prevent "duplicate UUID" errors.
 	 */
 	loadControlSwitches() {
-		const controlDevices = [
-			{
-				uniqueId: 'away',
-				displayName: 'Ecobee Status',
-			},
-		];
-
-		// loop over the discovered devices and register each one if it has not already been registered
-		for (const device of controlDevices) {
-			// generate a unique id for the accessory this should be generated from
-			// something globally unique, but constant, for example, the device serial
-			// number or MAC address
-			const uuid = this.api.hap.uuid.generate(device.uniqueId);
-
-			// see if an accessory with the same uuid has already been registered and restored from
-			// the cached devices we stored in the `configureAccessory` method above
-			const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-
-			if (existingAccessory) {
-				// the accessory already exists
-				this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-
-				// if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
-				// existingAccessory.context.device = device;
-				// this.api.updatePlatformAccessories([existingAccessory]);
-
-				// create the accessory handler for the restored accessory
-				// this is imported from `platformAccessory.ts`
-				if (device.uniqueId === 'away') {
-					new AwaySwitchAccessory(this, existingAccessory);
-				} else {
-					throw 'Invalid accessory ID';
-				}
-			} else {
-				// the accessory does not yet exist, so we need to create it
-				this.log.info('Adding new accessory:', device.displayName);
-
-				// create a new accessory
-				const accessory = new this.api.platformAccessory(device.displayName, uuid);
-
-				// store a copy of the device object in the `accessory.context`
-				// the `context` property can be used to store any data about the accessory you may need
-				accessory.context.device = device;
-
-				// create the accessory handler for the newly create accessory
-				// this is imported from `platformAccessory.ts`
-				if (device.uniqueId === 'away') {
-					new AwaySwitchAccessory(this, accessory);
-				} else {
-					throw 'Invalid accessory ID';
-				}
-
-				// link the accessory to your platform
-				this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-			}
+		// First, handle the main security system accessory
+		const mainDevice = {
+			uniqueId: 'away',
+			displayName: 'Ecobee Status',
+		};
+	
+		const mainUuid = this.api.hap.uuid.generate(mainDevice.uniqueId);
+		const existingMainAccessory = this.accessories.find(accessory => accessory.UUID === mainUuid);
+	
+		let mainAccessory;
+	
+		if (existingMainAccessory) {
+			this.log.info('Restoring existing accessory from cache:', existingMainAccessory.displayName);
+			mainAccessory = existingMainAccessory;
+			new AwaySwitchAccessory(this, existingMainAccessory);
+		} else {
+			this.log.info('Adding new accessory:', mainDevice.displayName);
+			mainAccessory = new this.api.platformAccessory(mainDevice.displayName, mainUuid);
+			mainAccessory.context.device = mainDevice;
+			new AwaySwitchAccessory(this, mainAccessory);
+			this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [mainAccessory]);
 		}
-
-		// Handle "Ecobee Away" switch if enabled - provides automation-friendly control of Away/Home status
+	
+		// Now handle the automation switch if enabled
 		if (this.config.enableAutomationSwitch) {
 			const automationDevice = {
 				uniqueId: 'automation-control',
-				displayName: 'Ecobee Away',  // Updated name
+				displayName: 'Ecobee Away',
 			};
-
+	
 			const automationUuid = this.api.hap.uuid.generate(automationDevice.uniqueId);
 			const existingAutomationAccessory = this.accessories.find(
 				accessory => accessory.UUID === automationUuid,
 			);
-
-			// Find the main security system accessory
-			const mainAccessory = this.accessories.find(
-				accessory => accessory.UUID === this.api.hap.uuid.generate('away'),
-			);
-
-			if (!mainAccessory) {
-				this.log.error('Main security system accessory not found');
-				return;
-			}
-
+	
 			if (existingAutomationAccessory) {
 				this.log.info('Restoring existing automation accessory from cache:',
 					existingAutomationAccessory.displayName);
 				new AutomationSwitchAccessory(this, existingAutomationAccessory, mainAccessory);
 			} else {
 				this.log.info('Adding new automation accessory:', automationDevice.displayName);
-				const accessory = new this.api.platformAccessory(
+				const automationAccessory = new this.api.platformAccessory(
 					automationDevice.displayName,
 					automationUuid,
 				);
-				accessory.context.device = automationDevice;
-				
-				new AutomationSwitchAccessory(this, accessory, mainAccessory);
-				
-				this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+				automationAccessory.context.device = automationDevice;
+				new AutomationSwitchAccessory(this, automationAccessory, mainAccessory);
+				this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [automationAccessory]);
 			}
 		}
 	}
