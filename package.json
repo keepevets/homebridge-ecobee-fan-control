@@ -2,6 +2,7 @@
   "displayName": "Homebridge Ecobee Status",
   "name": "homebridge-ecobee-status",
   "version": "2.1.5",
+  "type": "module",
   "description": "Homebridge plugin to control Ecobee thermostat Home/Away/Sleep status through HomeKit security system interface",
   "author": "Spencer S",
   "license": "Apache-2.0",
@@ -46,6 +47,7 @@
     "moment": "^2.29.4"
   },
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "@types/node": "^20.9.3",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",
