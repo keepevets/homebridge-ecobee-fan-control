@@ -7,5 +7,5 @@ import { EcobeeAPIPlatform } from './platform';
  * This method registers the platform with Homebridge
  */
 export = (api: API) => {
-	api.registerPlatform(PLATFORM_NAME, EcobeeAPIPlatform);
-}
+    api.registerPlatform(PLATFORM_NAME, EcobeeAPIPlatform);
+};

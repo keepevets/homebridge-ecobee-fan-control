@@ -1,15 +1,15 @@
-import js from "@eslint/js";
-import typescript from "@typescript-eslint/eslint-plugin";
-import typescriptParser from "@typescript-eslint/parser";
+const js = require("@eslint/js");
+const typescript = require("@typescript-eslint/eslint-plugin");
+const typescriptParser = require("@typescript-eslint/parser");
 
-export default [
+module.exports = [
   js.configs.recommended,
   {
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
         ecmaVersion: 2020,
-        sourceType: "module"
+        sourceType: "commonjs"
       },
       globals: {
         // Node.js globals
@@ -36,9 +36,7 @@ export default [
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": ["warn"],
-      // Allow console.warn and console.error, but warn about other console methods
       "no-console": ["warn", { allow: ["warn", "error"] }],
-      // Since we're working with Node.js, these globals are fine
       "no-undef": "error"
     },
     files: ["**/*.ts"],
