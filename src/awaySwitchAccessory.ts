@@ -143,77 +143,50 @@ export class AwaySwitchAccessory {
 			const selectionMatch = this.platform.config.thermostatSerialNumbers || '';
 			const selectionType = selectionMatch ? 'thermostats' : 'registered';
 	
-			if (climateRef === this.CLIMATE_HOME) {
-				const homeBody = {
-					'selection': {
-						'selectionType': selectionType,
-						'selectionMatch': selectionMatch,
-					},
-					'functions': [
-						{
-							'type': 'resumeProgram',
-							'params': {
-								'resumeAll': false,
-							},
+			// Use setHold for all states (including home) to override built-in schedule
+			const setHoldBody = {
+				'selection': {
+					'selectionType': selectionType,
+					'selectionMatch': selectionMatch,
+				},
+				'functions': [
+					{
+						'type': 'setHold',
+						'params': {
+							'holdType': 'indefinite',
+							'holdClimateRef': climateRef,
 						},
-					],
-				};
+					},
+				],
+			};
 	
-				const homeSetRequest = await this.makeEcobeeRequest(
-					() => axios.post('https://api.ecobee.com/1/thermostat?format=json', 
-						homeBody, 
-						{headers: {'Authorization': 'Bearer ' + authToken}},
-					),
-					'HOME mode set',
-				);
+			const setHoldRequest = await this.makeEcobeeRequest(
+				() => axios.post('https://api.ecobee.com/1/thermostat?format=json', 
+					setHoldBody, 
+					{headers: {'Authorization': 'Bearer ' + authToken}},
+				),
+				`${climateRef.toUpperCase()} mode set`,
+			);
+			
+			this.platform.log.info(`Set Ecobee to ${climateRef} with result: ${JSON.stringify(setHoldRequest.data)}`);
+			
+			if (setHoldRequest.data.status.code === 0) {
+				// Add a small delay to allow the thermostat to process the hold
+				await new Promise(resolve => setTimeout(resolve, 2000));
 				
-				this.platform.log.info(`Set Ecobee to home with result: ${JSON.stringify(homeSetRequest.data)}`);
-				
-				if (homeSetRequest.data.status.code === 0) {
-					this.service.updateCharacteristic(
-						this.platform.Characteristic.SecuritySystemCurrentState,
-						targetState,
-					);
-					this.platform.log.debug('Successfully updated to HOME state');
-				} else {
-					throw new Error(`Failed to set HOME mode: ${JSON.stringify(homeSetRequest.data)}`);
+				// Double-check the current status to ensure it took effect
+				const currentStatus = await this.checkStatusFromAPI();
+				if (currentStatus !== climateRef) {
+					this.platform.log.warn(`${climateRef.toUpperCase()} mode set succeeded but status check shows different state:`, currentStatus);
 				}
+				
+				this.service.updateCharacteristic(
+					this.platform.Characteristic.SecuritySystemCurrentState,
+					targetState,
+				);
+				this.platform.log.debug(`Successfully updated to ${climateRef.toUpperCase()} state`);
 			} else {
-				const setHoldBody = {
-					'selection': {
-						'selectionType': selectionType,
-						'selectionMatch': selectionMatch,
-					},
-					'functions': [
-						{
-							'type': 'setHold',
-							'params': {
-								'holdType': 'indefinite',
-								'holdClimateRef': climateRef,
-							},
-						},
-					],
-				};
-	
-				const setHoldRequest = await this.makeEcobeeRequest(
-					() => axios.post('https://api.ecobee.com/1/thermostat?format=json', 
-						setHoldBody, 
-						{headers: {'Authorization': 'Bearer ' + authToken}},
-					),
-					`${climateRef.toUpperCase()} mode set`,
-				);
-				
-				this.platform.log.info(`Set Ecobee to ${climateRef} with result: ${JSON.stringify(setHoldRequest.data)}`);
-				
-				if (setHoldRequest.data.status.code === 0) {
-					this.service.updateCharacteristic(
-						this.platform.Characteristic.SecuritySystemCurrentState,
-						targetState,
-					);
-					this.platform.log.debug(`Successfully updated to ${climateRef.toUpperCase()} state`);
-				} else {
-					throw new Error(`Failed to set ${climateRef.toUpperCase()} mode: ${JSON.stringify(setHoldRequest.data)}`);
-				}
+				throw new Error(`Failed to set ${climateRef.toUpperCase()} mode: ${JSON.stringify(setHoldRequest.data)}`);
 			}
 	
 			callback(null);
