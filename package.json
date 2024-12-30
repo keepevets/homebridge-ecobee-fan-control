@@ -5,6 +5,7 @@
   "description": "Homebridge plugin to control Ecobee thermostat Home/Away/Sleep status through HomeKit security system interface",
   "author": "Spencer S",
   "license": "Apache-2.0",
+  "homepage": "https://github.com/sbs44/homebridge-ecobee-status#readme",
   "repository": {
     "type": "git",
     "url": "git://github.com/sbs44/homebridge-ecobee-status.git"
