@@ -11,6 +11,7 @@ interface RetryOptions {
 
 interface Logger {
   error: (message: string, error?: Error | AxiosError) => void;
+  warn: (message: string, ...metadata: unknown[]) => void;
   debug?: (message: string, ...metadata: unknown[]) => void;
 }
 
@@ -21,6 +22,8 @@ export class NetworkRetry {
   private readonly backoffFactor: number;
   private readonly totalWindowMs: number;
   private readonly retryableErrors: string[];
+  private consecutiveFailures: number = 0;
+  private lastSuccessTime: number = Date.now();
 
   constructor(options: RetryOptions = {}) {
     this.totalWindowMs = (options.totalWindowSeconds || 270) * 1000; // Default 4.5 minutes to allow for overhead
@@ -35,46 +38,11 @@ export class NetworkRetry {
       'ENOTFOUND',
       'EAI_AGAIN',
     ];
-
-    // Validate that our retry strategy fits within the time window
-    const theoreticalTotalTime = this.calculateTheoreticalTotalTime();
-    if (theoreticalTotalTime > this.totalWindowMs) {
-      throw new Error(
-        `Retry strategy would take ${theoreticalTotalTime/1000}s which exceeds ` +
-        `available window of ${this.totalWindowMs/1000}s`
-      );
-    }
   }
 
-  private calculateTheoreticalTotalTime(): number {
-    let total = 0;
-    for (let attempt = 0; attempt < this.maxAttempts - 1; attempt++) {
-      total += this.calculateDelay(attempt);
-    }
-    return total;
-  }
-
-  private calculateDelay(attempt: number): number {
-    const theoreticalDelay = this.initialDelay * Math.pow(this.backoffFactor, attempt);
-    const cappedDelay = Math.min(theoreticalDelay, this.maxDelay);
-    
-    // Calculate remaining time in our window
-    const timeSpentSoFar = this.calculateTheoreticalTimeSpent(attempt);
-    const timeRemaining = this.totalWindowMs - timeSpentSoFar;
-    
-    // Never return a delay longer than remaining time
-    return Math.min(cappedDelay, timeRemaining);
-  }
-
-  private calculateTheoreticalTimeSpent(upToAttempt: number): number {
-    let total = 0;
-    for (let attempt = 0; attempt < upToAttempt; attempt++) {
-      total += Math.min(
-        this.initialDelay * Math.pow(this.backoffFactor, attempt),
-        this.maxDelay
-      );
-    }
-    return total;
+  // Public method for external error checking
+  public isRetryableNetworkError(error: unknown): boolean {
+    return this.isRetryableError(error);
   }
 
   private isRetryableError(error: unknown): boolean {
@@ -88,39 +56,104 @@ export class NetworkRetry {
       if (axiosError.response?.status && axiosError.response.status >= 500) {
         return true;
       }
+
+      // Check if it's a DNS resolution error
+      if (axiosError.code === 'EAI_AGAIN') {
+        return true;
+      }
+
+      // Check if it's a timeout error
+      if (axiosError.code === 'ETIMEDOUT') {
+        return true;
+      }
     }
     return false;
+  }
+
+  private formatErrorMessage(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      let message = axiosError.message;
+
+      if (axiosError.code === 'EAI_AGAIN') {
+        message = 'DNS resolution failed - network may be temporarily unavailable';
+      } else if (axiosError.code === 'ETIMEDOUT') {
+        message = 'Connection timed out - network may be temporarily unavailable';
+      }
+
+      if (axiosError.response?.data) {
+        const data = typeof axiosError.response.data === 'string'
+          ? axiosError.response.data
+          : JSON.stringify(axiosError.response.data);
+        message += ` (${data})`;
+      }
+      return message;
+    }
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  private calculateDelay(attempt: number): number {
+    // Base exponential backoff
+    const baseDelay = this.initialDelay * Math.pow(this.backoffFactor, attempt);
+
+    // Add jitter (±25% of base delay)
+    const jitter = baseDelay * 0.25 * (Math.random() * 2 - 1);
+    const delay = baseDelay + jitter;
+
+    // Cap at max delay
+    return Math.min(delay, this.maxDelay);
+  }
+
+  private shouldReduceVerbosity(): boolean {
+    const timeSinceSuccess = Date.now() - this.lastSuccessTime;
+    return this.consecutiveFailures > 3 || timeSinceSuccess > 5 * 60 * 1000;
   }
 
   async execute<T>(
     operation: () => Promise<T>,
     logger?: Logger,
+    context: string = 'operation'
   ): Promise<T> {
     const startTime = Date.now();
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt < this.maxAttempts; attempt++) {
       try {
-        return await operation();
+        const result = await operation();
+        this.consecutiveFailures = 0;
+        this.lastSuccessTime = Date.now();
+        return result;
       } catch (error) {
+        this.consecutiveFailures++;
         lastError = error instanceof Error ? error : new Error(String(error));
+
         const timeElapsed = Date.now() - startTime;
         const timeRemaining = this.totalWindowMs - timeElapsed;
 
-        if (!this.isRetryableError(error) || 
-            timeRemaining <= 0 || 
-            attempt === this.maxAttempts - 1) {
+        if (!this.isRetryableError(error) ||
+          timeRemaining <= 0 ||
+          attempt === this.maxAttempts - 1) {
           throw error;
         }
 
         const delay = this.calculateDelay(attempt);
+
         if (logger) {
-          logger.error(
-            `Network error occurred (attempt ${attempt + 1}/${this.maxAttempts}). ` +
-            `Retrying in ${delay/1000}s. Time elapsed: ${timeElapsed/1000}s, ` +
-            `Time remaining in window: ${timeRemaining/1000}s`,
-            lastError
-          );
+          const errorMessage = this.formatErrorMessage(error);
+
+          // Reduce log verbosity if we're seeing repeated failures
+          if (this.shouldReduceVerbosity()) {
+            if (attempt === 0) {
+              logger.warn(
+                `${context} failed: ${errorMessage}. Will retry in background.`
+              );
+            }
+          } else {
+            logger.warn(
+              `${context} failed (attempt ${attempt + 1}/${this.maxAttempts}): ${errorMessage}. ` +
+              `Retrying in ${Math.round(delay / 1000)}s...`
+            );
+          }
         }
 
         await new Promise(resolve => setTimeout(resolve, delay));

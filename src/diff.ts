@@ -8,7 +8,7 @@ import { NetworkRetry } from './network-retry';
 export class AuthTokenManager {
   private static instance: AuthTokenManager;
   private readonly ECOBEE_API_KEY = 'LvHbdQIXI5zoGoZW2uyWk2Ejfb1vtQWq';
-  private readonly TOKEN_REFRESH_BUFFER = 300; // Refresh 5 minutes before expiration
+  private readonly TOKEN_REFRESH_BUFFER = 300; // 5 minutes
   private readonly networkRetry: NetworkRetry;
 
   public authToken = '';
@@ -21,11 +21,11 @@ export class AuthTokenManager {
   constructor(private readonly platform: EcobeeAPIPlatform) {
     this.refreshToken = platform.config.refreshToken;
     this.networkRetry = new NetworkRetry({
-      totalWindowSeconds: this.TOKEN_REFRESH_BUFFER - 30, // Leave 30s buffer for overhead
-      maxAttempts: 8,        // Try up to 8 times over the window
-      initialDelay: 15000,   // Start with 15 seconds
-      maxDelay: 60000,       // Cap at 1 minute between retries
-      backoffFactor: 2,      // Double the delay each attempt
+      totalWindowSeconds: this.TOKEN_REFRESH_BUFFER - 30,
+      maxAttempts: 8,
+      initialDelay: 15000,
+      maxDelay: 60000,
+      backoffFactor: 2,
     });
   }
 
@@ -128,7 +128,7 @@ export class AuthTokenManager {
       const nextRefreshIn = (loadedExpiresIn - this.TOKEN_REFRESH_BUFFER) * 1000;
       this.scheduleBackgroundRefresh(nextRefreshIn);
 
-      // Update config file with new refresh token
+      // Update config file with new refresh token if it changed
       if (oldRefreshToken !== loadedUpdatedRefreshToken) {
         const updated = updateHomebridgeConfig(this.platform.api, (currentConfig) => {
           return currentConfig.replace(oldRefreshToken, loadedUpdatedRefreshToken);
@@ -145,16 +145,16 @@ export class AuthTokenManager {
     } catch (error) {
       // Only log detailed error if it's not a known network error
       if (!this.networkRetry.isRetryableNetworkError(error)) {
-      let errorMessage: string;
-      if (axios.isAxiosError(error)) {
-        errorMessage = error.message;
-        if (error.response?.data) {
-          errorMessage += ` - ${JSON.stringify(error.response.data)}`;
+        let errorMessage: string;
+        if (axios.isAxiosError(error)) {
+          errorMessage = error.message;
+          if (error.response?.data) {
+            errorMessage += ` - ${JSON.stringify(error.response.data)}`;
+          }
+        } else {
+          errorMessage = error instanceof Error ? error.message : String(error);
         }
-      } else {
-        errorMessage = error instanceof Error ? error.message : String(error);
-      }
-      this.platform.log.error(`Error refreshing token: ${errorMessage}`);
+        this.platform.log.error(`Error refreshing token: ${errorMessage}`);
       }
 
       // Schedule a retry in the background
