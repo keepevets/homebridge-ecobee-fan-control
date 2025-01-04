@@ -27,7 +27,7 @@ export class AwaySwitchAccessory {
 			.setCharacteristic(this.platform.Characteristic.SerialNumber, 'ECOBEEAWAY1');
 
 		// Use SecuritySystem service instead of Switch
-		this.service = this.accessory.getService(this.platform.Service.SecuritySystem) 
+		this.service = this.accessory.getService(this.platform.Service.SecuritySystem)
 			|| this.accessory.addService(this.platform.Service.SecuritySystem);
 
 		// Set the service name
@@ -66,7 +66,7 @@ export class AwaySwitchAccessory {
 	private mapClimateToSecurityState(climate: string, isTarget = false): number {
 		switch (climate) {
 		case this.CLIMATE_AWAY:
-			return isTarget 
+			return isTarget
 				? this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM
 				: this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM;
 		case this.CLIMATE_SLEEP:
@@ -134,7 +134,7 @@ export class AwaySwitchAccessory {
 		try {
 			const targetState = value as number;
 			const climateRef = this.mapSecurityToClimate(targetState);
-			
+
 			const needsRefresh = AuthTokenManager.getInstance().isExpired();
 			if (needsRefresh) {
 				await AuthTokenManager.getInstance().renewAuthToken();
@@ -142,9 +142,25 @@ export class AwaySwitchAccessory {
 			const authToken = AuthTokenManager.getInstance().authToken;
 			const selectionMatch = this.platform.config.thermostatSerialNumbers || '';
 			const selectionType = selectionMatch ? 'thermostats' : 'registered';
-	
-			// Use setHold for all states (including home) to override built-in schedule
-			const setHoldBody = {
+
+			// Determine if we should use indefinite hold based on the state
+      let useIndefiniteHold = false;
+      switch (climateRef) {
+        case this.CLIMATE_HOME:
+            useIndefiniteHold = this.platform.config.homeIndefiniteHold ?? false;
+            break;
+        case this.CLIMATE_AWAY:
+            useIndefiniteHold = this.platform.config.awayIndefiniteHold ?? true;
+            break;
+        case this.CLIMATE_SLEEP:
+            useIndefiniteHold = this.platform.config.sleepIndefiniteHold ?? true;
+            break;
+    }
+
+    let requestBody;
+    if (useIndefiniteHold) {
+        // Use setHold with indefinite hold
+        requestBody = {
 				'selection': {
 					'selectionType': selectionType,
 					'selectionMatch': selectionMatch,
@@ -159,36 +175,54 @@ export class AwaySwitchAccessory {
 					},
 				],
 			};
-	
-			const setHoldRequest = await this.makeEcobeeRequest(
-				() => axios.post('https://api.ecobee.com/1/thermostat?format=json', 
-					setHoldBody, 
+    } else {
+      // Use resumeProgram
+      requestBody = {
+          'selection': {
+              'selectionType': selectionType,
+              'selectionMatch': selectionMatch,
+          },
+          'functions': [
+              {
+                  'type': 'resumeProgram',
+                  'params': {
+                      'resumeAll': false,
+                  },
+              },
+          ],
+      };
+  }
+
+			const response = await this.makeEcobeeRequest(
+				() => axios.post(
+          'https://api.ecobee.com/1/thermostat?format=json',
+          requestBody,
 					{headers: {'Authorization': 'Bearer ' + authToken}},
 				),
 				`${climateRef.toUpperCase()} mode set`,
 			);
-			
-			this.platform.log.info(`Set Ecobee to ${climateRef} with result: ${JSON.stringify(setHoldRequest.data)}`);
-			
-			if (setHoldRequest.data.status.code === 0) {
-				// Add a small delay to allow the thermostat to process the hold
+
+			this.platform.log.info(`Set Ecobee to ${climateRef} with result: ${JSON.stringify(response.data)}`);
+
+			if (response.data.status.code === 0) {
+				// Add a small delay to allow the thermostat to process the change
 				await new Promise(resolve => setTimeout(resolve, 2000));
-				
+
 				// Double-check the current status to ensure it took effect
 				const currentStatus = await this.checkStatusFromAPI();
-				if (currentStatus !== climateRef) {
+				if (currentStatus !== climateRef && useIndefiniteHold) {
 					this.platform.log.warn(`${climateRef.toUpperCase()} mode set succeeded but status check shows different state:`, currentStatus);
 				}
-				
+
 				this.service.updateCharacteristic(
 					this.platform.Characteristic.SecuritySystemCurrentState,
 					targetState,
 				);
 				this.platform.log.debug(`Successfully updated to ${climateRef.toUpperCase()} state`);
 			} else {
-				throw new Error(`Failed to set ${climateRef.toUpperCase()} mode: ${JSON.stringify(setHoldRequest.data)}`);
+				throw new Error(`Failed to set ${climateRef.toUpperCase()} mode: ${JSON.stringify(response.data)}`);
 			}
-	
+
 			callback(null);
 		} catch (error) {
 			this.platform.log.error('Failed to set state:', error);
@@ -241,7 +275,7 @@ export class AwaySwitchAccessory {
 					this.platform.log.error('Unexpected query data structure:', JSON.stringify(queryData));
 					return this.CLIMATE_HOME;
 				}
-					
+
 				const events = queryData.thermostatList[0].events;
 
 				if (events.length > 0) {

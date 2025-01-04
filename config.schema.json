@@ -28,6 +28,24 @@
         "description": "Add an additional switch that can be used for location-based automations (ON = Away, OFF = Home)",
         "type": "boolean",
         "default": false
+      },
+      "homeIndefiniteHold": {
+        "title": "Use Indefinite Hold for Home",
+        "description": "When enabled, setting status to Home will use an indefinite hold instead of resuming your programmed Ecobee schedule. Default is false to allow your normal Ecobee schedule (morning, afternoon, evening programs) to run when you're home. Set to true if you want to maintain a single temperature setting when home, overriding your Ecobee schedule.",
+        "type": "boolean",
+        "default": false
+      },
+      "awayIndefiniteHold": {
+        "title": "Use Indefinite Hold for Away",
+        "description": "When enabled, setting status to Away will use an indefinite hold instead of resuming your programmed Ecobee schedule. Default is true to maintain energy-saving temperatures consistently while away, preventing scheduled temperature changes in an empty house.",
+        "type": "boolean",
+        "default": true
+      },
+      "sleepIndefiniteHold": {
+        "title": "Use Indefinite Hold for Sleep",
+        "description": "When enabled, setting status to Sleep will use an indefinite hold instead of resuming your programmed Ecobee schedule. Default is true to maintain your preferred sleep temperature throughout the night without interruption from scheduled changes.",
+        "type": "boolean",
+        "default": true
       }
     }
   }

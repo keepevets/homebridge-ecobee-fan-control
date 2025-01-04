@@ -56,6 +56,9 @@ Add the `EcobeeStatus` platform in your homebridge `config.json` file:
 | `refreshToken` | Yes | Authentication token (see below) |
 | `thermostatSerialNumbers` | No | Comma-separated list of thermostats to control |
 | `enableAutomationSwitch` | No | Adds a simple ON/OFF switch for Away control (default: false) |
+| `homeIndefiniteHold` | No | Use indefinite hold for Home status (default: false) |
+| `awayIndefiniteHold` | No | Use indefinite hold for Away status (default: true) |
+| `sleepIndefiniteHold` | No | Use indefinite hold for Sleep status (default: true) |
 
 ### Getting a Refresh Token
 
@@ -78,6 +81,48 @@ ecobee-auth-cli
 4. Copy the generated refresh token into your config file
 
 The plugin will automatically handle token refreshes and update the config file as needed.
+
+### Schedule Control Options
+
+This plugin provides fine-grained control over how each status (Home/Away/Sleep) interacts with your Ecobee's programmed schedule through three configuration options:
+
+#### homeIndefiniteHold (Default: false)
+Controls whether Home status uses an indefinite hold or resumes your Ecobee schedule:
+- When false (default): Your normal Ecobee schedule runs when you're home, allowing different temperature settings for morning, afternoon, and evening
+- When true: Maintains a single temperature setting when home, overriding your Ecobee schedule
+
+#### awayIndefiniteHold (Default: true)
+Controls whether Away status uses an indefinite hold or resumes your Ecobee schedule:
+- When true (default): Maintains energy-saving temperatures consistently while away
+- When false: Allows your Ecobee schedule to change temperatures even when you're away
+
+#### sleepIndefiniteHold (Default: true)
+Controls whether Sleep status uses an indefinite hold or resumes your Ecobee schedule:
+- When true (default): Maintains your preferred sleep temperature throughout the night
+- When false: Allows scheduled temperature changes during sleep hours
+
+Example configuration:
+```json
+{
+    "platforms": [
+        {
+            "name": "Ecobee Status",
+            "platform": "EcobeeStatus",
+            "refreshToken": "your-refresh-token",
+            "homeIndefiniteHold": false,
+            "awayIndefiniteHold": true,
+            "sleepIndefiniteHold": true
+        }
+    ]
+}
+```
+
+The default settings are optimized for typical use cases:
+- When home: Run your normal Ecobee schedule for different times of day
+- When away: Maintain energy-saving temperatures until you return
+- When sleeping: Keep your preferred sleep temperature without interruption
+
+You can adjust these settings based on your preferences. For example, if you want complete HomeKit control and prefer to override your Ecobee schedule entirely, set all options to true.
 
 ### Thermostat Serial Numbers (Optional)
 

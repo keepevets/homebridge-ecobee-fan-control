@@ -19,7 +19,14 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 
 	constructor(
 		public readonly log: Logger,
-		public readonly config: PlatformConfig,
+    public readonly config: PlatformConfig & {
+      refreshToken: string;
+      thermostatSerialNumbers?: string;
+      enableAutomationSwitch?: boolean;
+      homeIndefiniteHold?: boolean;
+      awayIndefiniteHold?: boolean;
+      sleepIndefiniteHold?: boolean;
+    },
 		public readonly api: API,
 	) {
 		this.log.debug('Finished initializing platform:', this.config.name);
@@ -62,12 +69,12 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 			uniqueId: 'away',
 			displayName: 'Ecobee Status',
 		};
-	
+
 		const mainUuid = this.api.hap.uuid.generate(mainDevice.uniqueId);
 		const existingMainAccessory = this.accessories.find(accessory => accessory.UUID === mainUuid);
-	
+
 		let mainAccessory;
-	
+
 		if (existingMainAccessory) {
 			this.log.info('Restoring existing accessory from cache:', existingMainAccessory.displayName);
 			mainAccessory = existingMainAccessory;
@@ -79,19 +86,19 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 			new AwaySwitchAccessory(this, mainAccessory);
 			this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [mainAccessory]);
 		}
-	
+
 		// Now handle the automation switch if enabled
 		if (this.config.enableAutomationSwitch) {
 			const automationDevice = {
 				uniqueId: 'automation-control',
 				displayName: 'Ecobee Away',
 			};
-	
+
 			const automationUuid = this.api.hap.uuid.generate(automationDevice.uniqueId);
 			const existingAutomationAccessory = this.accessories.find(
 				accessory => accessory.UUID === automationUuid,
 			);
-	
+
 			if (existingAutomationAccessory) {
 				this.log.info('Restoring existing automation accessory from cache:',
 					existingAutomationAccessory.displayName);
