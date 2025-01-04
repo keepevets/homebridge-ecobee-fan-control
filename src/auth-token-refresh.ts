@@ -145,21 +145,12 @@ export class AuthTokenManager {
     } catch (error) {
       // Only log detailed error if it's not a known network error
       if (!this.networkRetry.isRetryableNetworkError(error)) {
-      let errorMessage: string;
-      if (axios.isAxiosError(error)) {
-        errorMessage = error.message;
-        if (error.response?.data) {
-          errorMessage += ` - ${JSON.stringify(error.response.data)}`;
-        }
-      } else {
-        errorMessage = error instanceof Error ? error.message : String(error);
-      }
-      this.platform.log.error(`Error refreshing token: ${errorMessage}`);
+      this.platform.log.warn('Error refreshing token:', error);
       }
 
       // Schedule a retry in the background
       this.scheduleBackgroundRefresh(30000); // 30 seconds
-      throw error;
+      return undefined;
     } finally {
       this.refreshInProgress = false;
     }

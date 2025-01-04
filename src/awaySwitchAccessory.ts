@@ -137,7 +137,10 @@ export class AwaySwitchAccessory {
 
 			const needsRefresh = AuthTokenManager.getInstance().isExpired();
 			if (needsRefresh) {
-				await AuthTokenManager.getInstance().renewAuthToken();
+				const refreshedToken = await AuthTokenManager.getInstance().renewAuthToken();
+        if (!refreshedToken) {
+          throw new Error('Failed to refresh expired auth token');
+        }
 			}
 			const authToken = AuthTokenManager.getInstance().authToken;
 			const selectionMatch = this.platform.config.thermostatSerialNumbers || '';
@@ -225,7 +228,7 @@ export class AwaySwitchAccessory {
 
 			callback(null);
 		} catch (error) {
-			this.platform.log.error('Failed to set state:', error);
+			this.platform.log.error('Failed to set target state:', error);
 			callback(error as Error);
 		}
 	}
@@ -234,20 +237,30 @@ export class AwaySwitchAccessory {
 	 * Handle GET requests for target state
 	 */
 	async getTargetState(callback: CharacteristicGetCallback) {
-		const apiStatus = await this.checkStatusFromAPI();
-		const state = this.mapClimateToSecurityState(apiStatus, true); // Add true for target state
-		this.platform.log.debug('Get Target State ->', state);
-		callback(null, state);
+    try {
+      const apiStatus = await this.checkStatusFromAPI();
+      const state = this.mapClimateToSecurityState(apiStatus, true); // Add true for target state
+      this.platform.log.debug('Get Target State ->', state);
+      callback(null, state);
+    } catch (error) {
+      this.platform.log.error('Failed to get target state:', error);
+      callback(error as Error);
+    }
 	}
 
 	/**
 	 * Handle GET requests for current state
 	 */
 	async getCurrentState(callback: CharacteristicGetCallback) {
-		const apiStatus = await this.checkStatusFromAPI();
-		const state = this.mapClimateToSecurityState(apiStatus, false); // Add false for current state
-		this.platform.log.debug('Get Current State ->', state);
-		callback(null, state);
+    try {
+      const apiStatus = await this.checkStatusFromAPI();
+      const state = this.mapClimateToSecurityState(apiStatus, false); // Add false for current state
+      this.platform.log.debug('Get Current State ->', state);
+      callback(null, state);
+    } catch (error) {
+      this.platform.log.error('Failed to get current state:', error);
+      callback(error as Error);
+    }
 	}
 
 	/**

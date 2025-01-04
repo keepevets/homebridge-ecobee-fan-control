@@ -38,14 +38,18 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 		// in order to ensure they weren't added to homebridge already. This event can also be used
 		// to start discovery of new accessories.
 		this.api.on('didFinishLaunching', async () => {
-			log.debug('Executed didFinishLaunching callback');
+			this.log.debug('Executed didFinishLaunching callback');
 			// load access token
-			await AuthTokenManager.getInstance().renewAuthToken();
+      try {
+        await AuthTokenManager.getInstance().renewAuthToken();
 
 			// run the method to discover / register your devices as accessories
 			this.loadControlSwitches();
-		});
-	}
+		} catch (error) {
+      this.log.error('Error during startup:', error);
+    }
+  });
+  }
 
 	/**
 	 * This function is invoked when homebridge restores cached accessories from disk at startup.
