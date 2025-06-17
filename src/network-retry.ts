@@ -1,3 +1,4 @@
+// network-retry.ts
 import axios, { AxiosError } from 'axios';
 
 interface RetryOptions {
@@ -48,12 +49,19 @@ export class NetworkRetry {
   private isRetryableError(error: unknown): boolean {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError;
+
       // Check if it's a network error
       if (axiosError.code && this.retryableErrors.includes(axiosError.code)) {
         return true;
       }
+
       // Check if it's a 5xx server error
       if (axiosError.response?.status && axiosError.response.status >= 500) {
+        return true;
+      }
+
+      // Check if it's a 429 rate limit error
+      if (axiosError.response?.status === 429) {
         return true;
       }
 
@@ -92,8 +100,28 @@ export class NetworkRetry {
     return error instanceof Error ? error.message : String(error);
   }
 
-  private calculateDelay(attempt: number): number {
-    // Base exponential backoff
+  private calculateDelay(attempt: number, error?: unknown): number {
+    // Check for rate limit headers first
+    if (axios.isAxiosError(error) && error.response?.status === 429) {
+      // Check for Retry-After header
+      const retryAfter = error.response.headers['retry-after'];
+      if (retryAfter) {
+        // If it's a number, it's seconds; if it's a date, parse it
+        const retryAfterMs = isNaN(Number(retryAfter))
+          ? new Date(retryAfter).getTime() - Date.now()
+          : Number(retryAfter) * 1000;
+
+        // Ensure it's within reasonable bounds
+        return Math.min(Math.max(retryAfterMs, this.initialDelay), 5 * 60 * 1000); // Max 5 minutes
+      }
+
+      // For 429 without Retry-After, use longer delays
+      const baseDelay = this.initialDelay * Math.pow(2, attempt + 2); // More aggressive backoff
+      const jitter = baseDelay * 0.25 * (Math.random() * 2 - 1);
+      return Math.min(baseDelay + jitter, this.maxDelay * 2); // Allow longer delays for rate limits
+    }
+
+    // Original calculation for other errors
     const baseDelay = this.initialDelay * Math.pow(this.backoffFactor, attempt);
 
     // Add jitter (±25% of base delay)
@@ -136,13 +164,17 @@ export class NetworkRetry {
           throw error;
         }
 
-        const delay = this.calculateDelay(attempt);
+        const delay = this.calculateDelay(attempt, error);
 
         if (logger) {
           const errorMessage = this.formatErrorMessage(error);
 
-          // Reduce log verbosity if we're seeing repeated failures
-          if (this.shouldReduceVerbosity()) {
+          // Special handling for rate limit errors
+          if (axios.isAxiosError(error) && error.response?.status === 429) {
+            logger.warn(
+              `${context} rate limited. Waiting ${Math.round(delay / 1000)}s before retry...`
+            );
+          } else if (this.shouldReduceVerbosity()) {
             if (attempt === 0) {
               logger.warn(
                 `${context} failed: ${errorMessage}. Will retry in background.`

@@ -46,6 +46,14 @@
         "description": "When enabled, setting status to Sleep will use an indefinite hold instead of resuming your programmed Ecobee schedule. Default is true to maintain your preferred sleep temperature throughout the night without interruption from scheduled changes.",
         "type": "boolean",
         "default": true
+      },
+      "statusPollingMinutes": {
+        "title": "Status Polling Interval",
+        "description": "How often to check thermostat status (in minutes). Default: 60",
+        "type": "integer",
+        "default": 60,
+        "minimum": 30,
+        "maximum": 1440
       }
     }
   }

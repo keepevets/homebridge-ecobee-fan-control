@@ -1,3 +1,4 @@
+// auth-token-refresh.ts
 import { EcobeeAPIPlatform } from './platform';
 import moment from 'moment';
 import axios from 'axios';
@@ -17,15 +18,18 @@ export class AuthTokenManager {
   private refreshInProgress = false;
   private lastRefreshAttempt = moment(0);
   private backgroundRefreshTimeout?: ReturnType<typeof setTimeout>;
+  private readonly MIN_REFRESH_INTERVAL = 60; // Increase from 30 to 60 seconds
+  private readonly RATE_LIMIT_BACKOFF = 5 * 60 * 1000; // 5 minutes for rate limit errors
+  private rateLimitedUntil?: moment.Moment;
 
   constructor(private readonly platform: EcobeeAPIPlatform) {
     this.refreshToken = platform.config.refreshToken;
     this.networkRetry = new NetworkRetry({
-      totalWindowSeconds: this.TOKEN_REFRESH_BUFFER - 30, // Leave 30s buffer for overhead
-      maxAttempts: 8,        // Try up to 8 times over the window
-      initialDelay: 15000,   // Start with 15 seconds
-      maxDelay: 60000,       // Cap at 1 minute between retries
-      backoffFactor: 2,      // Double the delay each attempt
+      totalWindowSeconds: this.TOKEN_REFRESH_BUFFER - 30,
+      maxAttempts: 5,          // Reduce attempts for rate limiting
+      initialDelay: 30000,     // Start with 30 seconds for auth endpoints
+      maxDelay: 120000,        // Cap at 2 minutes between retries
+      backoffFactor: 2,
     });
   }
 
@@ -40,6 +44,11 @@ export class AuthTokenManager {
   }
 
   isExpired(): boolean {
+    // Check if we're rate limited
+    if (this.rateLimitedUntil && moment().isBefore(this.rateLimitedUntil)) {
+      return false; // Don't attempt refresh while rate limited
+    }
+
     return this.authToken === '' ||
       moment().add(this.TOKEN_REFRESH_BUFFER, 'seconds').isAfter(this.expiration);
   }
@@ -66,6 +75,15 @@ export class AuthTokenManager {
   }
 
   async renewAuthToken(): Promise<string | undefined> {
+    // Check if we're in a rate limit backoff period
+    if (this.rateLimitedUntil && moment().isBefore(this.rateLimitedUntil)) {
+      const waitTime = this.rateLimitedUntil.diff(moment(), 'seconds');
+      this.platform.log.warn(
+        `Rate limited. Waiting ${waitTime}s before attempting token refresh.`
+      );
+      return this.authToken; // Return existing token if still valid
+    }
+
     // Prevent multiple simultaneous refresh attempts
     if (this.refreshInProgress) {
       this.platform.log.debug('Token refresh already in progress, waiting...');
@@ -77,9 +95,9 @@ export class AuthTokenManager {
 
     // Prevent too frequent refresh attempts
     const timeSinceLastAttempt = moment().diff(this.lastRefreshAttempt, 'seconds');
-    if (timeSinceLastAttempt < 30) {
+    if (timeSinceLastAttempt < this.MIN_REFRESH_INTERVAL) {
       this.platform.log.debug(
-        `Skipping refresh, last attempt was ${timeSinceLastAttempt}s ago`,
+        `Skipping refresh, last attempt was ${timeSinceLastAttempt}s ago`
       );
       return this.authToken;
     }
@@ -104,6 +122,11 @@ export class AuthTokenManager {
               code: oldRefreshToken,
               client_id: this.ECOBEE_API_KEY,
             }),
+            {
+              headers: {
+                'User-Agent': 'homebridge-ecobee-status/2.x',
+              }
+            }
           );
           return response.data;
         },
@@ -141,15 +164,27 @@ export class AuthTokenManager {
         }
       }
 
+      // Clear rate limit on success
+      this.rateLimitedUntil = undefined;
+
       return loadedAuthToken;
     } catch (error) {
-      // Only log detailed error if it's not a known network error
-      if (!this.networkRetry.isRetryableNetworkError(error)) {
-      this.platform.log.warn('Error refreshing token:', error);
-      }
+      // Handle rate limit errors specifically
+      if (axios.isAxiosError(error) && error.response?.status === 429) {
+        // Set rate limit backoff
+        this.rateLimitedUntil = moment().add(this.RATE_LIMIT_BACKOFF, 'milliseconds');
 
-      // Schedule a retry in the background
-      this.scheduleBackgroundRefresh(30000); // 30 seconds
+        this.platform.log.error(
+          `Token refresh rate limited. Will retry after ${this.rateLimitedUntil.format('HH:mm:ss')}`
+        );
+
+        // Schedule retry after rate limit period
+        this.scheduleBackgroundRefresh(this.RATE_LIMIT_BACKOFF);
+      } else if (!this.networkRetry.isRetryableNetworkError(error)) {
+        this.platform.log.warn('Error refreshing token:', error);
+        // Schedule a normal retry
+        this.scheduleBackgroundRefresh(60000); // 1 minute
+      }
       return undefined;
     } finally {
       this.refreshInProgress = false;

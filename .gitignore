@@ -4,6 +4,9 @@ dist
 # macOS generated files
 .DS_Store
 
+# Diff files
+diff*
+
 # ------------- Defaults ------------- #
 
 # Logs

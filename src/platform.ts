@@ -26,6 +26,7 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
       homeIndefiniteHold?: boolean;
       awayIndefiniteHold?: boolean;
       sleepIndefiniteHold?: boolean;
+      statusPollingMinutes?: number;
     },
 		public readonly api: API,
 	) {
