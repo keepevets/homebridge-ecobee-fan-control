@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.12] - 2025-07-22
+
+### Fixed
+- Improved network error handling by implementing NetworkRetry for all Ecobee API calls
+- Fixed ETIMEDOUT and ENETUNREACH errors during network connectivity issues
+- Added exponential backoff with proper retry logic for transient network failures
+
 ## [2.1.11] - 2025-06-17
 
 ### Fixed

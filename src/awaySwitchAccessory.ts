@@ -3,6 +3,7 @@ import { Service, PlatformAccessory, CharacteristicValue, CharacteristicSetCallb
 import axios from 'axios';
 import { EcobeeAPIPlatform } from './platform';
 import { AuthTokenManager } from './auth-token-refresh';
+import { NetworkRetry } from './network-retry';
 
 /**
  * Platform Accessory
@@ -11,6 +12,7 @@ import { AuthTokenManager } from './auth-token-refresh';
  */
 export class AwaySwitchAccessory {
   private service: Service;
+  private readonly networkRetry: NetworkRetry;
 
   // Define constants for climate states
   private readonly CLIMATE_HOME = 'home';
@@ -21,6 +23,15 @@ export class AwaySwitchAccessory {
     private readonly platform: EcobeeAPIPlatform,
     private readonly accessory: PlatformAccessory,
   ) {
+    // Initialize NetworkRetry with appropriate settings for API calls
+    this.networkRetry = new NetworkRetry({
+      maxAttempts: 8,
+      initialDelay: 15000, // 15 seconds
+      maxDelay: 60000, // 1 minute
+      backoffFactor: 2,
+      retryableErrors: ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH'],
+    });
+
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Ecobee')
@@ -108,39 +119,11 @@ export class AwaySwitchAccessory {
    * Helper method to handle API requests with retry logic
    */
   private async makeEcobeeRequest<T>(request: () => Promise<T>, operationType: string): Promise<T> {
-    try {
-      return await request();
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        this.platform.log.error(`Ecobee API Error during ${operationType}:`, {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          url: error.config?.url,
-          method: error.config?.method,
-        });
-
-        // Handle rate limiting
-        if (error.response?.status === 429) {
-          this.platform.log.error(
-            `Rate limited during ${operationType}. Please reduce the frequency of status changes.`
-          );
-          throw new Error('Rate limited by Ecobee API. Please try again later.');
-        }
-
-        // If we get a 500 error, wait a bit and retry once
-        if (error.response?.status === 500) {
-          this.platform.log.info(`Retrying ${operationType} after 500 error...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          return await request();
-        }
-
-        throw error;
-      } else {
-        this.platform.log.error(`Non-Axios error during ${operationType}:`, error);
-        throw error;
-      }
-    }
+    return this.networkRetry.execute(
+      request,
+      this.platform.log,
+      `Ecobee API ${operationType}`
+    );
   }
 
   /**
