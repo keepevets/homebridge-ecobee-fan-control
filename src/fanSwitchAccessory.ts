@@ -64,9 +64,9 @@ export class FanSwitchAccessory {
         // const targetState = apiStatus === this.FAN_ON ? this.platform.Characteristic.Active.ON : this.platform.Characteristic.Active.OFF;    // explicit true for target state
         this.service.updateCharacteristic(this.platform.Characteristic.Active, currentState);
         // this.service.updateCharacteristic(this.platform.Characteristic.Active, targetState);
-        this.platform.log.info('Pushed updated current state to HomeKit:', apiStatus);
+        this.platform.log.debug('Pushed updated current state to HomeKit:', apiStatus);
       } catch (error) {
-        this.platform.log.info('Failed to poll status:', error);
+        this.platform.log.debug('Failed to poll status:', error);
       }
     }, pollingInterval);
   }
@@ -83,14 +83,14 @@ export class FanSwitchAccessory {
   }
 
   setActive(value) {
-	this.platform.log.info('Triggered SET Active:', Boolean(value));
+	this.platform.log.debug('Triggered SET Active:', Boolean(value));
 	this.setTargetState(Boolean(value), () => {});
 	this.service.getCharacteristic(this.platform.Characteristic.Active)
                   .updateValue(Boolean(value));
   }
 
   getActive() {
-	this.platform.log.info('Triggered GET Active');
+	this.platform.log.debug('Triggered GET Active');
     return this.getCurrentState(() => {});
   }
   /**
@@ -98,10 +98,10 @@ export class FanSwitchAccessory {
    */
   async setTargetState(value, callback: CharacteristicSetCallback) {
     try {
-		this.platform.log.info('Triggered SET Target State:', value);
+		this.platform.log.debug('Triggered SET Target State:', value);
       const targetState = value as boolean;
       const fanRef = targetState ? this.FAN_ON : this.FAN_AUTO;
-	  this.platform.log.info('Triggered SET Target State:', fanRef);
+	  this.platform.log.debug('Triggered SET Target State:', fanRef);
       const needsRefresh = AuthTokenManager.getInstance().isExpired();
       if (needsRefresh) {
         const refreshedToken = await AuthTokenManager.getInstance().renewAuthToken();
@@ -160,7 +160,7 @@ export class FanSwitchAccessory {
 			  };
           break;
       }
-	  this.platform.log.info('Request Body:', requestBody);
+	  this.platform.log.debug('Request Body:', requestBody);
       const response = await this.makeEcobeeRequest(
         () => axios.post(
           'https://api.ecobee.com/1/thermostat?format=json',
@@ -169,8 +169,8 @@ export class FanSwitchAccessory {
         ),
         `${fanRef.toUpperCase()} mode set`,
       );
-	  this.platform.log.info('Response:', response);
-      this.platform.log.info(`Set Ecobee to ${fanRef} with result: ${JSON.stringify(response.data)}`);
+	  this.platform.log.debug('Response:', response);
+      this.platform.log.debug(`Set Ecobee to ${fanRef} with result: ${JSON.stringify(response.data)}`);
 
       if (response.data.status.code === 0) {
         // Add a small delay to allow the thermostat to process the change
@@ -183,7 +183,7 @@ export class FanSwitchAccessory {
         }
 
         this.service.updateCharacteristic(this.platform.Characteristic.Active, targetState);
-        this.platform.log.info(`Successfully updated to ${fanRef.toUpperCase()} state`);
+        this.platform.log.debug(`Successfully updated to ${fanRef.toUpperCase()} state`);
       } else {
         throw new Error(`Failed to set ${fanRef.toUpperCase()} mode: ${JSON.stringify(response.data)}`);
       }
@@ -202,7 +202,7 @@ export class FanSwitchAccessory {
     try {
       const apiStatus = await this.checkStatusFromAPI();
       const state = apiStatus === this.FAN_ON ? true : false; // Add true for target state
-      this.platform.log.info('Get Target State ->', state);
+      this.platform.log.debug('Get Target State ->', state);
       callback(null, state);
     } catch (error) {
       this.platform.log.error('Failed to get target state:', error);
@@ -217,7 +217,7 @@ export class FanSwitchAccessory {
     try {
       const apiStatus = await this.checkStatusFromAPI();
       const state = apiStatus === this.FAN_ON ? true : false; // Add false for current state
-      this.platform.log.info('Get Current State ->', state);
+      this.platform.log.debug('Get Current State ->', state);
       callback(null, state);
     } catch (error) {
       this.platform.log.error('Failed to get current state:', error);
@@ -252,7 +252,7 @@ export class FanSwitchAccessory {
         }
 
         const events = queryData.thermostatList[0].events;
-		this.platform.log.info('Events:', events);
+		this.platform.log.debug('Events:', events);
         if (events.length > 0) {
           const mostRecentEvent = events[0];
           return mostRecentEvent.fan || this.FAN_AUTO;
