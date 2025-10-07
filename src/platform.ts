@@ -96,12 +96,12 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 				const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 				if (existingAccessory) {
 					this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-					new FanSwitchAccessory(this, existingAccessory);
+					new FanSwitchAccessory(this, existingAccessory, thermostat);
 				} else {
 					this.log.info('Adding new accessory:', thermostat);
 					const newAccessory = new this.api.platformAccessory('Fan Control - ' + thermostat, uuid);
 					newAccessory.context.device = {uniqueId: thermostat, displayName: 'Fan Control - ' + thermostat};
-					new FanSwitchAccessory(this, newAccessory);
+					new FanSwitchAccessory(this, newAccessory, thermostat);
 					this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [newAccessory]);
 				}
 			}

@@ -12,6 +12,7 @@ import { NetworkRetry } from './network-retry';
  */
 export class FanSwitchAccessory {
   private service: Service;
+
   private readonly networkRetry: NetworkRetry;
 
   // Define constants for climate states
@@ -22,6 +23,7 @@ export class FanSwitchAccessory {
   constructor(
     private readonly platform: EcobeeAPIPlatform,
     private readonly accessory: PlatformAccessory,
+	private readonly thermostatSerialNumber: string,
   ) {
     // Initialize NetworkRetry with appropriate settings for API calls
     this.networkRetry = new NetworkRetry({
@@ -108,7 +110,7 @@ export class FanSwitchAccessory {
         }
       }
       const authToken = AuthTokenManager.getInstance().authToken;
-      const selectionMatch = this.platform.config.thermostatSerialNumbers || '';
+      const selectionMatch = this.thermostatSerialNumber || '';
       const selectionType = selectionMatch ? 'thermostats' : 'registered';
 
 
