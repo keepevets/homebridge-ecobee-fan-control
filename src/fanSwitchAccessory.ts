@@ -87,7 +87,7 @@ export class FanSwitchAccessory {
 
   getActive() {
 	this.platform.log.info('Triggered GET Active');
-    return this.getTargetState(() => {});
+    return this.getCurrentState(() => {});
   }
   /**
    * Handle SET requests from HomeKit
