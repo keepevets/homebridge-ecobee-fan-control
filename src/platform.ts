@@ -1,8 +1,7 @@
 import { API, IndependentPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { AwaySwitchAccessory } from './awaySwitchAccessory';
-import { AutomationSwitchAccessory } from './automationSwitchAccessory';
+import { FanSwitchAccessory } from './fanSwitchAccessory';
 import { AuthTokenManager } from './auth-token-refresh';
 
 /**
@@ -22,10 +21,7 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
     public readonly config: PlatformConfig & {
       refreshToken: string;
       thermostatSerialNumbers?: string;
-      enableAutomationSwitch?: boolean;
-      homeIndefiniteHold?: boolean;
-      awayIndefiniteHold?: boolean;
-      sleepIndefiniteHold?: boolean;
+      enableFanSwitch?: boolean;
       statusPollingMinutes?: number;
     },
 		public readonly api: API,
@@ -83,41 +79,13 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 		if (existingMainAccessory) {
 			this.log.info('Restoring existing accessory from cache:', existingMainAccessory.displayName);
 			mainAccessory = existingMainAccessory;
-			new AwaySwitchAccessory(this, existingMainAccessory);
+			new FanSwitchAccessory(this, existingMainAccessory);
 		} else {
 			this.log.info('Adding new accessory:', mainDevice.displayName);
 			mainAccessory = new this.api.platformAccessory(mainDevice.displayName, mainUuid);
 			mainAccessory.context.device = mainDevice;
-			new AwaySwitchAccessory(this, mainAccessory);
+			new FanSwitchAccessory(this, mainAccessory);
 			this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [mainAccessory]);
-		}
-
-		// Now handle the automation switch if enabled
-		if (this.config.enableAutomationSwitch) {
-			const automationDevice = {
-				uniqueId: 'automation-control',
-				displayName: 'Ecobee Away',
-			};
-
-			const automationUuid = this.api.hap.uuid.generate(automationDevice.uniqueId);
-			const existingAutomationAccessory = this.accessories.find(
-				accessory => accessory.UUID === automationUuid,
-			);
-
-			if (existingAutomationAccessory) {
-				this.log.info('Restoring existing automation accessory from cache:',
-					existingAutomationAccessory.displayName);
-				new AutomationSwitchAccessory(this, existingAutomationAccessory, mainAccessory);
-			} else {
-				this.log.info('Adding new automation accessory:', automationDevice.displayName);
-				const automationAccessory = new this.api.platformAccessory(
-					automationDevice.displayName,
-					automationUuid,
-				);
-				automationAccessory.context.device = automationDevice;
-				new AutomationSwitchAccessory(this, automationAccessory, mainAccessory);
-				this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [automationAccessory]);
-			}
 		}
 	}
 }

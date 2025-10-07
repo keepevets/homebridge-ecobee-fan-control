@@ -4,10 +4,7 @@ import { API } from 'homebridge';
 export interface EcobeeAwayPlatformConfig {
 	refreshToken: string;
   thermostatSerialNumbers?: string;
-  enableAutomationSwitch?: boolean;
-  homeIndefiniteHold?: boolean;
-  awayIndefiniteHold?: boolean;
-  sleepIndefiniteHold?: boolean;
+  enableFanSwitch?: boolean;
 }
 
 export function updateHomebridgeConfig(homebridge: API, update: (config: string) => string) {

@@ -1,6 +1,5 @@
 // types.ts
-export enum ClimateState {
-    HOME = 'home',
-    AWAY = 'away',
-    SLEEP = 'sleep'
+export enum FanState {
+    AUTO = 'auto',
+    ON = 'on',
 }

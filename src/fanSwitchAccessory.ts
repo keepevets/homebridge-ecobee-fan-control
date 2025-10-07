@@ -10,14 +10,14 @@ import { NetworkRetry } from './network-retry';
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class AwaySwitchAccessory {
+export class FanSwitchAccessory {
   private service: Service;
   private readonly networkRetry: NetworkRetry;
 
   // Define constants for climate states
-  private readonly CLIMATE_HOME = 'home';
-  private readonly CLIMATE_AWAY = 'away';
-  private readonly CLIMATE_SLEEP = 'sleep';
+  private readonly FAN_ON = 'on';
+  private readonly FAN_AUTO = 'auto';
+
 
   constructor(
     private readonly platform: EcobeeAPIPlatform,
@@ -39,27 +39,17 @@ export class AwaySwitchAccessory {
       .setCharacteristic(this.platform.Characteristic.SerialNumber, 'ECOBEEAWAY1');
 
     // Use SecuritySystem service instead of Switch
-    this.service = this.accessory.getService(this.platform.Service.SecuritySystem)
-      || this.accessory.addService(this.platform.Service.SecuritySystem);
+    this.service =
+      this.accessory.getService(this.platform.Service.Fanv2) ||
+      this.accessory.addService(this.platform.Service.Fanv2);
 
     // Set the service name
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.displayName);
 
     // Register handlers for the SecuritySystemTargetState Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.SecuritySystemTargetState)
-      .setProps({
-        validValues: [
-          this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM,  // Home
-          this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM,  // Away
-          this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM, // Sleep
-        ],
-      })
+    this.service.getCharacteristic(this.platform.Characteristic.Active)
       .on('set', this.setTargetState.bind(this))
       .on('get', this.getTargetState.bind(this));
-
-    // Register handlers for the SecuritySystemCurrentState Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.SecuritySystemCurrentState)
-      .on('get', this.getCurrentState.bind(this));
 
     // Poll for updates
     const pollingMinutes = this.platform.config.statusPollingMinutes || 60;
@@ -68,51 +58,15 @@ export class AwaySwitchAccessory {
     setInterval(async () => {
       try {
         const apiStatus = await this.checkStatusFromAPI();
-        const currentState = this.mapClimateToSecurityState(apiStatus, false);  // explicit false for current state
-        const targetState = this.mapClimateToSecurityState(apiStatus, true);    // explicit true for target state
-        this.service.updateCharacteristic(this.platform.Characteristic.SecuritySystemCurrentState, currentState);
-        this.service.updateCharacteristic(this.platform.Characteristic.SecuritySystemTargetState, targetState);
+        const currentState = apiStatus === this.FAN_ON ? true : this.platform.Characteristic.Active.INACTIVE; // explicit false for current state
+        // const targetState = apiStatus === this.FAN_ON ? this.platform.Characteristic.Active.ON : this.platform.Characteristic.Active.OFF;    // explicit true for target state
+        this.service.updateCharacteristic(this.platform.Characteristic.Active, currentState);
+        // this.service.updateCharacteristic(this.platform.Characteristic.Active, targetState);
         this.platform.log.debug('Pushed updated current state to HomeKit:', apiStatus);
       } catch (error) {
         this.platform.log.debug('Failed to poll status:', error);
       }
     }, pollingInterval);
-  }
-
-  /**
-   * Maps climate mode to HomeKit security system state
-   */
-  private mapClimateToSecurityState(climate: string, isTarget = false): number {
-    switch (climate) {
-      case this.CLIMATE_AWAY:
-        return isTarget
-          ? this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM
-          : this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM;
-      case this.CLIMATE_SLEEP:
-        return isTarget
-          ? this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM
-          : this.platform.Characteristic.SecuritySystemCurrentState.NIGHT_ARM;
-      case this.CLIMATE_HOME:
-      default:
-        return isTarget
-          ? this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM
-          : this.platform.Characteristic.SecuritySystemCurrentState.STAY_ARM;
-    }
-  }
-
-  /**
-   * Maps HomeKit security system state to climate mode
-   */
-  private mapSecurityToClimate(state: number): string {
-    switch (state) {
-      case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
-        return this.CLIMATE_AWAY;
-      case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
-        return this.CLIMATE_SLEEP;
-      case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
-      default:
-        return this.CLIMATE_HOME;
-    }
   }
 
   /**
@@ -129,10 +83,10 @@ export class AwaySwitchAccessory {
   /**
    * Handle SET requests from HomeKit
    */
-  async setTargetState(value: CharacteristicValue, callback: CharacteristicSetCallback) {
+  async setTargetState(value, callback: CharacteristicSetCallback) {
     try {
-      const targetState = value as number;
-      const climateRef = this.mapSecurityToClimate(targetState);
+      const targetState = value as boolean;
+      const fanRef = targetState !== true ? this.FAN_AUTO : this.FAN_ON;
 
       const needsRefresh = AuthTokenManager.getInstance().isExpired();
       if (needsRefresh) {
@@ -145,54 +99,52 @@ export class AwaySwitchAccessory {
       const selectionMatch = this.platform.config.thermostatSerialNumbers || '';
       const selectionType = selectionMatch ? 'thermostats' : 'registered';
 
-      // Determine if we should use indefinite hold based on the state
-      let useIndefiniteHold = false;
-      switch (climateRef) {
-        case this.CLIMATE_HOME:
-          useIndefiniteHold = this.platform.config.homeIndefiniteHold ?? false;
-          break;
-        case this.CLIMATE_AWAY:
-          useIndefiniteHold = this.platform.config.awayIndefiniteHold ?? true;
-          break;
-        case this.CLIMATE_SLEEP:
-          useIndefiniteHold = this.platform.config.sleepIndefiniteHold ?? true;
-          break;
-      }
 
+      // Determine if we should use indefinite hold based on the state
       let requestBody;
-      if (useIndefiniteHold) {
-        // Use setHold with indefinite hold
-        requestBody = {
-          'selection': {
-            'selectionType': selectionType,
-            'selectionMatch': selectionMatch,
-          },
-          'functions': [
-            {
-              'type': 'setHold',
-              'params': {
-                'holdType': 'indefinite',
-                'holdClimateRef': climateRef,
-              },
-            },
-          ],
-        };
-      } else {
-        // Use resumeProgram
-        requestBody = {
-          'selection': {
-            'selectionType': selectionType,
-            'selectionMatch': selectionMatch,
-          },
-          'functions': [
-            {
-              'type': 'resumeProgram',
-              'params': {
-                'resumeAll': false,
-              },
-            },
-          ],
-        };
+      switch (targetState) {
+        case true:
+			requestBody = {
+				'selection': {
+				  'selectionType': selectionType,
+				  'selectionMatch': selectionMatch,
+				},
+				'functions': [
+					{
+						"type":"setHold",
+						"params": {
+							"coolHoldTemp":859,
+							"heatHoldTemp":450,
+							"holdType":"indefinite",
+							"fan":"on",
+							"isTemperatureAbsolute":false,
+							"isTemperatureRelative":false
+						},
+					},
+				],
+			  };
+          break;
+        default:
+			requestBody = {
+				'selection': {
+				  'selectionType': selectionType,
+				  'selectionMatch': selectionMatch,
+				},
+				'functions': [
+					{
+						"type":"setHold",
+						"params": {
+							"coolHoldTemp":859,
+							"heatHoldTemp":450,
+							"holdType":"indefinite",
+							"fan":"auto",
+							"isTemperatureAbsolute":false,
+							"isTemperatureRelative":false
+						},
+					},
+				],
+			  };
+          break;
       }
 
       const response = await this.makeEcobeeRequest(
@@ -201,10 +153,10 @@ export class AwaySwitchAccessory {
           requestBody,
           { headers: { 'Authorization': 'Bearer ' + authToken } },
         ),
-        `${climateRef.toUpperCase()} mode set`,
+        `${fanRef.toUpperCase()} mode set`,
       );
 
-      this.platform.log.info(`Set Ecobee to ${climateRef} with result: ${JSON.stringify(response.data)}`);
+      this.platform.log.info(`Set Ecobee to ${fanRef} with result: ${JSON.stringify(response.data)}`);
 
       if (response.data.status.code === 0) {
         // Add a small delay to allow the thermostat to process the change
@@ -212,17 +164,14 @@ export class AwaySwitchAccessory {
 
         // Double-check the current status to ensure it took effect
         const currentStatus = await this.checkStatusFromAPI();
-        if (currentStatus !== climateRef && useIndefiniteHold) {
-          this.platform.log.warn(`${climateRef.toUpperCase()} mode set succeeded but status check shows different state:`, currentStatus);
+        if (currentStatus !== fanRef) {
+          this.platform.log.warn(`${fanRef.toUpperCase()} mode set succeeded but status check shows different state:`, currentStatus);
         }
 
-        this.service.updateCharacteristic(
-          this.platform.Characteristic.SecuritySystemCurrentState,
-          targetState,
-        );
-        this.platform.log.debug(`Successfully updated to ${climateRef.toUpperCase()} state`);
+        this.service.updateCharacteristic(this.platform.Characteristic.Active, targetState);
+        this.platform.log.debug(`Successfully updated to ${fanRef.toUpperCase()} state`);
       } else {
-        throw new Error(`Failed to set ${climateRef.toUpperCase()} mode: ${JSON.stringify(response.data)}`);
+        throw new Error(`Failed to set ${fanRef.toUpperCase()} mode: ${JSON.stringify(response.data)}`);
       }
 
       callback(null);
@@ -238,7 +187,7 @@ export class AwaySwitchAccessory {
   async getTargetState(callback: CharacteristicGetCallback) {
     try {
       const apiStatus = await this.checkStatusFromAPI();
-      const state = this.mapClimateToSecurityState(apiStatus, true); // Add true for target state
+      const state = apiStatus === this.FAN_ON ? true : false; // Add true for target state
       this.platform.log.debug('Get Target State ->', state);
       callback(null, state);
     } catch (error) {
@@ -253,7 +202,7 @@ export class AwaySwitchAccessory {
   async getCurrentState(callback: CharacteristicGetCallback) {
     try {
       const apiStatus = await this.checkStatusFromAPI();
-      const state = this.mapClimateToSecurityState(apiStatus, false); // Add false for current state
+      const state = apiStatus === this.FAN_ON ? true : false; // Add false for current state
       this.platform.log.debug('Get Current State ->', state);
       callback(null, state);
     } catch (error) {
@@ -285,24 +234,24 @@ export class AwaySwitchAccessory {
 
         if (!queryData || !queryData.thermostatList) {
           this.platform.log.error('Unexpected query data structure:', JSON.stringify(queryData));
-          return this.CLIMATE_HOME;
+          return this.FAN_AUTO;
         }
 
         const events = queryData.thermostatList[0].events;
 
         if (events.length > 0) {
           const mostRecentEvent = events[0];
-          return mostRecentEvent.holdClimateRef || this.CLIMATE_HOME;
+          return mostRecentEvent.fan || this.FAN_AUTO;
         } else {
-          return this.CLIMATE_HOME;
+          return this.FAN_AUTO;
         }
       } catch (error) {
         this.platform.log.error('Failed to check status:', error);
-        return this.CLIMATE_HOME;
+        return this.FAN_AUTO;
       }
     } catch (error) {
       this.platform.log.error('Error in checkStatusFromAPI:', error);
-      return this.CLIMATE_HOME;
+      return this.FAN_AUTO;
     }
   }
 }
