@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "EcobeeFanSwitch",
+  "pluginAlias": "EcobeeFanControl",
   "pluginType": "platform",
   "singular": true,
   "schema": {
@@ -9,7 +9,7 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Ecobee Fan Switch"
+        "default": "Ecobee Fan Control"
       },
       "refreshToken": {
         "title": "Ecobee Refresh Token",
@@ -23,8 +23,8 @@
         "type": "string",
         "placeholder": "e.g. 100904852660,654234216036"
       },
-      "enableFanSwitch": {
-        "title": "Enable Fan Switch",
+      "enableFanControl": {
+        "title": "Enable Fan Control",
         "description": "Add an additional switch that can be used for location-based automations (ON = Away, OFF = Home)",
         "type": "boolean",
         "default": false

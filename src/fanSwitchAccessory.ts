@@ -36,7 +36,7 @@ export class FanSwitchAccessory {
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Ecobee')
       .setCharacteristic(this.platform.Characteristic.Model, 'Climate Controller')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'ECOBEEAWAY1');
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'ECOBEEFAN1');
 
     // Use SecuritySystem service instead of Switch
     this.service =

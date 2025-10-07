@@ -67,8 +67,8 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 	loadControlSwitches() {
 		// First, handle the main security system accessory
 		const mainDevice = {
-			uniqueId: 'away',
-			displayName: 'Ecobee Status',
+			uniqueId: 'fan-control',
+			displayName: 'Ecobee Fan Control',
 		};
 
 		const mainUuid = this.api.hap.uuid.generate(mainDevice.uniqueId);
