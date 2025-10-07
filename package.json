@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Ecobee Fan Control",
   "name": "homebridge-ecobee-fan-control",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Homebridge plugin to control Ecobee thermostat fan control through HomeKit security system interface",
   "license": "Apache-2.0",
   "homepage": "https://github.com/sbs44/homebridge-ecobee-fan-control#readme",
