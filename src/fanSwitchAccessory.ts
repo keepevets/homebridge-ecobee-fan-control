@@ -58,7 +58,7 @@ export class FanSwitchAccessory {
     setInterval(async () => {
       try {
         const apiStatus = await this.checkStatusFromAPI();
-        const currentState = apiStatus === this.FAN_ON ? true : this.platform.Characteristic.Active.INACTIVE; // explicit false for current state
+        const currentState = apiStatus === this.FAN_ON ? true : false // explicit false for current state
         // const targetState = apiStatus === this.FAN_ON ? this.platform.Characteristic.Active.ON : this.platform.Characteristic.Active.OFF;    // explicit true for target state
         this.service.updateCharacteristic(this.platform.Characteristic.Active, currentState);
         // this.service.updateCharacteristic(this.platform.Characteristic.Active, targetState);
@@ -83,6 +83,8 @@ export class FanSwitchAccessory {
   setActive(value) {
 	this.platform.log.info('Triggered SET Active:', Boolean(value));
 	this.setTargetState(Boolean(value), () => {});
+	this.service.getCharacteristic(this.platform.Characteristic.Active)
+                  .updateValue(Boolean(value));
   }
 
   getActive() {
