@@ -81,8 +81,8 @@ export class FanSwitchAccessory {
   }
 
   setActive(value) {
-	this.platform.log.info('Triggered SET Active:', value);
-	this.setTargetState(value, () => {});
+	this.platform.log.info('Triggered SET Active:', Boolean(value));
+	this.setTargetState(Boolean(value), () => {});
   }
 
   getActive() {
@@ -96,7 +96,7 @@ export class FanSwitchAccessory {
     try {
 		this.platform.log.info('Triggered SET Target State:', value);
       const targetState = value as boolean;
-      const fanRef = targetState !== true ? this.FAN_AUTO : this.FAN_ON;
+      const fanRef = targetState === true ? this.FAN_ON : this.FAN_AUTO;
 
       const needsRefresh = AuthTokenManager.getInstance().isExpired();
       if (needsRefresh) {
