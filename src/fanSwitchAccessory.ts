@@ -98,8 +98,8 @@ export class FanSwitchAccessory {
     try {
 		this.platform.log.info('Triggered SET Target State:', value);
       const targetState = value as boolean;
-      const fanRef = targetState === true ? this.FAN_ON : this.FAN_AUTO;
-
+      const fanRef = targetState ? this.FAN_ON : this.FAN_AUTO;
+	  this.platform.log.info('Triggered SET Target State:', fanRef);
       const needsRefresh = AuthTokenManager.getInstance().isExpired();
       if (needsRefresh) {
         const refreshedToken = await AuthTokenManager.getInstance().renewAuthToken();
@@ -114,8 +114,8 @@ export class FanSwitchAccessory {
 
       // Determine if we should use indefinite hold based on the state
       let requestBody;
-      switch (targetState) {
-        case true:
+      switch (fanRef) {
+        case this.FAN_ON:
 			requestBody = {
 				'selection': {
 				  'selectionType': selectionType,
