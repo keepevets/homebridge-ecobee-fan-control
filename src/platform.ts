@@ -66,28 +66,28 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 	 */
 	loadControlSwitches(config) {
 		// First, handle the main security system accessory
-		const mainDevice = {
-			uniqueId: 'fan-control',
-			displayName: 'Ecobee Fan Control',
-		};
+		// const mainDevice = {
+		// 	uniqueId: 'fan-control',
+		// 	displayName: 'Ecobee Fan Control',
+		// };
 
 
-		const mainUuid = this.api.hap.uuid.generate(mainDevice.uniqueId);
-		const existingMainAccessory = this.accessories.find(accessory => accessory.UUID === mainUuid);
+		// const mainUuid = this.api.hap.uuid.generate(mainDevice.uniqueId);
+		// const existingMainAccessory = this.accessories.find(accessory => accessory.UUID === mainUuid);
 
-		let mainAccessory;
+		// let mainAccessory;
 
-		if (existingMainAccessory) {
-			this.log.info('Restoring existing accessory from cache:', existingMainAccessory.displayName);
-			mainAccessory = existingMainAccessory;
-			new FanSwitchAccessory(this, existingMainAccessory);
-		} else {
-			this.log.info('Adding new accessory:', mainDevice.displayName);
-			mainAccessory = new this.api.platformAccessory(mainDevice.displayName, mainUuid);
-			mainAccessory.context.device = mainDevice;
-			new FanSwitchAccessory(this, mainAccessory);
-			this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [mainAccessory]);
-		}
+		// if (existingMainAccessory) {
+		// 	this.log.info('Restoring existing accessory from cache:', existingMainAccessory.displayName);
+		// 	mainAccessory = existingMainAccessory;
+		// 	new FanSwitchAccessory(this, existingMainAccessory);
+		// } else {
+		// 	this.log.info('Adding new accessory:', mainDevice.displayName);
+		// 	mainAccessory = new this.api.platformAccessory(mainDevice.displayName, mainUuid);
+		// 	mainAccessory.context.device = mainDevice;
+		// 	new FanSwitchAccessory(this, mainAccessory);
+		// 	this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [mainAccessory]);
+		// }
 		let thermostats = config.thermostatSerialNumbers;
 		if (thermostats && thermostats.includes(',')) {
 			thermostats = thermostats.split(',');
