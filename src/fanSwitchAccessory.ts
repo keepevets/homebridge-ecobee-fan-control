@@ -237,9 +237,10 @@ export class FanSwitchAccessory {
       const authToken = AuthTokenManager.getInstance().authToken;
 
       try {
+		const selectionMatch = this.thermostatSerialNumber || '';
         const queryRequest = await this.makeEcobeeRequest(
           () => axios.get(
-            'https://api.ecobee.com/1/thermostat?format=json&body={"selection":{"selectionType":"registered","selectionMatch":"","includeEvents":true}}',
+            'https://api.ecobee.com/1/thermostat?format=json&body={"selection":{"selectionType":"thermostats","selectionMatch":"' + selectionMatch + '","includeEvents":true}}',
             { headers: { 'Authorization': 'Bearer ' + authToken } },
           ),
           'status check',
