@@ -80,6 +80,13 @@ export class FanSwitchAccessory {
     );
   }
 
+  setActive(value) {
+	this.setTargetState(value, () => {});
+  }
+
+  getActive() {
+    return this.getTargetState(() => {});
+  }
   /**
    * Handle SET requests from HomeKit
    */
