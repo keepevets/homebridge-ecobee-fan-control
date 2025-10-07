@@ -41,7 +41,7 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
         await AuthTokenManager.getInstance().renewAuthToken();
 
 			// run the method to discover / register your devices as accessories
-			this.loadControlSwitches();
+			this.loadControlSwitches(config);
 		} catch (error) {
       this.log.error('Error during startup:', error);
     }
@@ -64,12 +64,13 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 	 * Accessories must only be registered once, previously created accessories
 	 * must not be registered again to prevent "duplicate UUID" errors.
 	 */
-	loadControlSwitches() {
+	loadControlSwitches(config) {
 		// First, handle the main security system accessory
 		const mainDevice = {
 			uniqueId: 'fan-control',
 			displayName: 'Ecobee Fan Control',
 		};
+
 
 		const mainUuid = this.api.hap.uuid.generate(mainDevice.uniqueId);
 		const existingMainAccessory = this.accessories.find(accessory => accessory.UUID === mainUuid);
@@ -86,6 +87,24 @@ export class EcobeeAPIPlatform implements IndependentPlatformPlugin {
 			mainAccessory.context.device = mainDevice;
 			new FanSwitchAccessory(this, mainAccessory);
 			this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [mainAccessory]);
+		}
+		let thermostats = config.thermostatSerialNumbers;
+		if (thermostats && thermostats.includes(',')) {
+			thermostats = thermostats.split(',');
+			for (const thermostat of thermostats) {
+				const uuid = this.api.hap.uuid.generate(thermostat);
+				const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+				if (existingAccessory) {
+					this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+					new FanSwitchAccessory(this, existingAccessory);
+				} else {
+					this.log.info('Adding new accessory:', thermostat);
+					const newAccessory = new this.api.platformAccessory('Fan Control - ' + thermostat, uuid);
+					newAccessory.context.device = {uniqueId: thermostat, displayName: 'Fan Control - ' + thermostat};
+					new FanSwitchAccessory(this, newAccessory);
+					this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [newAccessory]);
+				}
+			}
 		}
 	}
 }
