@@ -248,7 +248,7 @@ export class FanSwitchAccessory {
         }
 
         const events = queryData.thermostatList[0].events;
-
+		this.platform.log.info('Events:', events);
         if (events.length > 0) {
           const mostRecentEvent = events[0];
           return mostRecentEvent.fan || this.FAN_AUTO;
